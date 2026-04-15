@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onErrorCaptured, onMounted, ref, watch } from "vue";
+import { computed, onErrorCaptured, onMounted, onUnmounted, ref, watch } from "vue";
 import { removeToast, toastList } from "./utils/toast";
 
 const THEME_KEY = "usedchang-theme";
@@ -21,12 +21,25 @@ const currentTheme = computed(
 );
 const appError = ref("");
 
+const themeSwitcherRef = ref(null);
+
+function handleOutsideClick(event) {
+  if (expanded.value && themeSwitcherRef.value && !themeSwitcherRef.value.contains(event.target)) {
+    expanded.value = false;
+  }
+}
+
 onMounted(() => {
   const saved = localStorage.getItem(THEME_KEY);
   if (themeOptions.some((option) => option.id === saved)) {
     theme.value = saved;
   }
   applyTheme(theme.value);
+  document.addEventListener("click", handleOutsideClick);
+});
+
+onUnmounted(() => {
+  document.removeEventListener("click", handleOutsideClick);
 });
 
 watch(theme, (value) => {
@@ -66,7 +79,7 @@ onErrorCaptured((error) => {
           <li><RouterLink to="/cf-daily">CF统计</RouterLink></li>
           <li><RouterLink to="/solutions">题解编辑</RouterLink></li>
         </ul>
-        <div class="theme-switcher">
+        <div class="theme-switcher" ref="themeSwitcherRef">
           <button
             class="theme-btn"
             :class="{ 'theme-btn-active': true }"
