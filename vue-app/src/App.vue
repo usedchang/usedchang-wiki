@@ -78,6 +78,7 @@ onErrorCaptured((error) => {
           <li><RouterLink to="/study-plan">学习计划</RouterLink></li>
           <li><RouterLink to="/cf-daily">CF统计</RouterLink></li>
           <li><RouterLink to="/solutions">题解编辑</RouterLink></li>
+          <li><RouterLink to="/friends">友链</RouterLink></li>
         </ul>
         <div class="theme-switcher" ref="themeSwitcherRef">
           <button
