@@ -1,9 +1,26 @@
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-*.code-workspace
+# 依赖（不要提交！）
+node_modules/
 
-# Local History for Visual Studio Code
+# 构建产物（每次 build 会自动生成）
+dist/
+
+# 环境变量（包含敏感信息）
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+
+# 日志
+npm-debug.log*
+yarn-debug.log*
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# Vue
+*.code-workspace
 .history/
