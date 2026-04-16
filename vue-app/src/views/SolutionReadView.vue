@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, onMounted, nextTick } from "vue";
 import { useRoute } from "vue-router";
 import MarkdownIt from "markdown-it";
 import markdownItTaskLists from "markdown-it-task-lists";
@@ -11,8 +11,10 @@ import markdownItSup from "markdown-it-sup";
 import markdownItTexmath from "markdown-it-texmath";
 import katex from "katex";
 import DOMPurify from "dompurify";
+import hljs from "highlight.js";
 import { getPostById } from "../utils/postStorage";
 import "katex/dist/katex.min.css";
+import "highlight.js/styles/github-dark.css";
 
 const route = useRoute();
 const post = ref(null);
@@ -41,6 +43,15 @@ const md = new MarkdownIt({
   linkify: true,
   breaks: true,
   typographer: true,
+  highlight: function (str, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        const highlighted = hljs.highlight(str, { language: lang }).value;
+        return `<pre class="hljs"><div class="code-header"><span class="code-lang">${lang}</span><button class="copy-btn" data-code="${encodeURIComponent(str)}">copy</button></div><code class="hljs language-${lang}">${highlighted}</code></pre>`;
+      } catch (__) {}
+    }
+    return `<pre class="hljs"><div class="code-header"><button class="copy-btn" data-code="${encodeURIComponent(str)}">copy</button></div><code>${str}</code></pre>`;
+  },
 })
   .use(markdownItTaskLists, { enabled: true })
   .use(markdownItFootnote)
@@ -57,6 +68,44 @@ const md = new MarkdownIt({
 const renderedHtml = computed(() => {
   if (!post.value?.content) return "";
   return DOMPurify.sanitize(md.render(post.value.content));
+});
+
+function copyToClipboard(button) {
+  const code = button.dataset.code;
+  if (code && !button.classList.contains("copied")) {
+    navigator.clipboard.writeText(decodeURIComponent(code)).then(() => {
+      button.textContent = "Copied!";
+      button.classList.add("copied");
+      setTimeout(() => {
+        button.textContent = "copy";
+        button.classList.remove("copied");
+      }, 1000);
+    }).catch(err => {
+      console.error("Copy failed:", err);
+    });
+  }
+}
+
+function setupCopyButtons() {
+  nextTick(() => {
+    const buttons = document.querySelectorAll(".copy-btn");
+    buttons.forEach(button => {
+      button.removeEventListener("click", () => copyToClipboard(button));
+      button.addEventListener("click", () => copyToClipboard(button));
+    });
+  });
+}
+
+watch(
+  () => post.value,
+  () => {
+    setupCopyButtons();
+  },
+  { immediate: true }
+);
+
+onMounted(() => {
+  setupCopyButtons();
 });
 </script>
 
@@ -75,7 +124,7 @@ const renderedHtml = computed(() => {
           <span v-for="tag in post.tags" :key="tag">{{ tag }}</span>
         </div>
       </header>
-      <article class="markdown-preview" v-html="renderedHtml"></article>
+      <article class="markdown-preview" v-html="renderedHtml" ref="markdownPreview"></article>
     </section>
 
     <section v-else class="empty-state">
