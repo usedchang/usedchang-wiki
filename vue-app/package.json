@@ -12,6 +12,7 @@
     "@fontsource/inter": "^5.2.8",
     "@fontsource/noto-serif-sc": "^5.2.9",
     "dompurify": "^3.4.0",
+    "highlight.js": "^11.11.1",
     "katex": "^0.16.45",
     "markdown-it": "^14.1.1",
     "markdown-it-deflist": "^3.0.0",
