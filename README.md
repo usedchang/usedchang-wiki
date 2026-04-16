@@ -4,13 +4,13 @@ XCPC 题解博客，记录算法学习与刷题历程。
 
 ## 在线访问
 
-**网站**: https://usedchang.netlify.app/
+**网站**: https://www.usedchang.cn/
 
 ## 技术栈
 
 - **前端框架**: Vue 3
 - **构建工具**: Vite
-- **部署平台**: Netlify
+- **部署平台**: Vercel
 
 ## 本地开发
 
