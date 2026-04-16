@@ -10,13 +10,7 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   plugins: [vue()],
-  // 👇 新增这两行，强制解决 Rolldown 解析报错
   optimizeDeps: {
     include: ['highlight.js']
-  },
-  build: {
-    rollupOptions: {
-      external: ['highlight.js']
-    }
   }
 })
