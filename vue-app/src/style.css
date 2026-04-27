@@ -1183,3 +1183,165 @@ textarea {
     min-height: 46vh;
   }
 }
+
+/* 评论系统样式 */
+.comment-panel {
+  margin-top: 28px;
+  padding: 20px;
+}
+
+.comment-form {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: var(--surface-soft);
+  border-radius: 12px;
+}
+
+.form-group {
+  margin-bottom: 12px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.form-input,
+.form-textarea {
+  width: 100%;
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  transition: all 0.2s ease;
+}
+
+.form-input:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 20%, transparent);
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.reply-form {
+  margin: 16px 0;
+  padding: 16px;
+  background: var(--card-2);
+  border-radius: 12px;
+  border-left: 4px solid var(--primary);
+}
+
+.reply-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.comment-list {
+  margin-top: 20px;
+}
+
+.comment-list h3 {
+  margin-bottom: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.comment-item {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 12px;
+  background: linear-gradient(160deg, var(--card), var(--card-2));
+}
+
+.comment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.comment-author {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.comment-time {
+  font-size: 0.85rem;
+  color: var(--text-soft);
+}
+
+.comment-content {
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.comment-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.comment-action-btn {
+  background: none;
+  border: none;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.comment-action-btn:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+.reply-list {
+  margin-top: 12px;
+  padding-left: 20px;
+  border-left: 2px solid var(--border);
+}
+
+.reply-item {
+  padding: 12px;
+  background: var(--surface-soft);
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+
+.reply-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.reply-author {
+  font-weight: 500;
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+.reply-time {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+}
+
+.reply-content {
+  margin-bottom: 6px;
+  line-height: 1.5;
+  font-size: 0.85rem;
+}
