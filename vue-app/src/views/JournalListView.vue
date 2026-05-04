@@ -5,24 +5,28 @@ import { createPost, getAllPosts, removePost, POST_KIND } from "../utils/postSto
 import { pushToast } from "../utils/toast";
 
 const router = useRouter();
-const posts = ref(getAllPosts().filter((p) => p.kind !== POST_KIND.journal));
+const posts = ref(getAllPosts().filter((p) => p.kind === POST_KIND.journal));
 const keyword = ref("");
 const selectedTag = ref("all");
 const selectedStatus = ref("all");
 const sortBy = ref("updatedAt-desc");
 
-function createSolution() {
-  const post = createPost({ kind: POST_KIND.solution });
-  posts.value = getAllPosts().filter((p) => p.kind !== POST_KIND.journal);
-  pushToast("已新建题解草稿", "success");
-  router.push(`/solutions/${post.id}`);
+function refreshList() {
+  posts.value = getAllPosts().filter((p) => p.kind === POST_KIND.journal);
 }
 
-function removeSolution(id) {
+function createJournal() {
+  const post = createPost({ kind: POST_KIND.journal });
+  refreshList();
+  pushToast("已新建游记草稿", "success");
+  router.push(`/journal/${post.id}`);
+}
+
+function removeJournal(id) {
   const target = posts.value.find((item) => item.id === id);
   removePost(id);
-  posts.value = getAllPosts().filter((p) => p.kind !== POST_KIND.journal);
-  pushToast(`已删除：${target?.title || "未命名题解"}`, "info");
+  refreshList();
+  pushToast(`已删除：${target?.title || "未命名游记"}`, "info");
 }
 
 const sortedPosts = computed(() => {
@@ -48,7 +52,7 @@ const allTags = computed(() => {
 const filteredPosts = computed(() => {
   const searchText = keyword.value.trim().toLowerCase();
   return sortedPosts.value.filter((post) => {
-    const titleText = String(post.title || "未命名题解").toLowerCase();
+    const titleText = String(post.title || "未命名游记").toLowerCase();
     const matchesKeyword = !searchText || titleText.includes(searchText);
     const tags = Array.isArray(post.tags) ? post.tags : [];
     const matchesTag = selectedTag.value === "all" || tags.includes(selectedTag.value);
@@ -79,19 +83,20 @@ function formatTime(ts) {
 </script>
 
 <template>
-  <main class="container section solution-list-page">
+  <main class="container section solution-list-page journal-list-page">
     <div class="section-title-row">
-      <h2>题解管理</h2>
-      <button class="btn btn-primary" @click="createSolution">新增题解</button>
+      <h2>游记 · 文章</h2>
+      <button class="btn btn-primary" @click="createJournal">新建游记</button>
     </div>
+
+    <p class="journal-intro panel">
+      用 Markdown 写行程、心情与配图，发布后读者可在同一页面浏览全文并<strong>发表评论</strong>（与题解共用评论存储，按文章 ID 区分）。
+    </p>
 
     <section class="panel solution-filter-panel">
       <h3 class="panel-title">快速筛选</h3>
       <div class="solution-filter-grid">
-        <input
-          v-model="keyword"
-          placeholder="按标题搜索，如：最短路 / DP / 线段树"
-        />
+        <input v-model="keyword" placeholder="按标题搜索，如：青岛 / 三日" />
         <select v-model="selectedStatus">
           <option value="all">全部状态</option>
           <option value="draft">草稿</option>
@@ -117,14 +122,14 @@ function formatTime(ts) {
       <div v-if="draftPosts.length" class="solution-list">
         <article v-for="item in draftPosts" :key="item.id" class="solution-item">
           <div>
-            <p class="solution-title">{{ item.title || "未命名题解" }}</p>
+            <p class="solution-title">{{ item.title || "未命名游记" }}</p>
             <p class="solution-meta">更新时间：{{ formatTime(item.updatedAt) }}</p>
-            <p class="solution-url">独立链接：/posts/{{ item.id }}</p>
+            <p class="solution-url">阅读链接：/posts/{{ item.id }}</p>
           </div>
           <div class="card-actions">
             <RouterLink class="btn btn-ghost" :to="`/posts/${item.id}`">阅读</RouterLink>
-            <RouterLink class="btn btn-ghost" :to="`/solutions/${item.id}`">编辑</RouterLink>
-            <button class="btn btn-danger" @click="removeSolution(item.id)">删除</button>
+            <RouterLink class="btn btn-ghost" :to="`/journal/${item.id}`">编辑</RouterLink>
+            <button class="btn btn-danger" @click="removeJournal(item.id)">删除</button>
           </div>
         </article>
       </div>
@@ -136,24 +141,24 @@ function formatTime(ts) {
       <div v-if="publishedPosts.length" class="solution-list">
         <article v-for="item in publishedPosts" :key="item.id" class="solution-item">
           <div>
-            <p class="solution-title">{{ item.title || "未命名题解" }}</p>
+            <p class="solution-title">{{ item.title || "未命名游记" }}</p>
             <p class="solution-meta">
               发布时间：{{ formatTime(item.publishedAt) }} · 更新时间：{{ formatTime(item.updatedAt) }}
             </p>
-            <p class="solution-url">独立链接：/posts/{{ item.id }}</p>
+            <p class="solution-url">阅读链接：/posts/{{ item.id }}</p>
           </div>
           <div class="card-actions">
             <RouterLink class="btn btn-ghost" :to="`/posts/${item.id}`">阅读</RouterLink>
-            <RouterLink class="btn btn-ghost" :to="`/solutions/${item.id}`">编辑</RouterLink>
-            <button class="btn btn-danger" @click="removeSolution(item.id)">删除</button>
+            <RouterLink class="btn btn-ghost" :to="`/journal/${item.id}`">编辑</RouterLink>
+            <button class="btn btn-danger" @click="removeJournal(item.id)">删除</button>
           </div>
         </article>
       </div>
-      <p v-else class="empty-hint">暂无已发布文章。</p>
+      <p v-else class="empty-hint">暂无已发布游记。</p>
     </section>
 
     <div v-if="!sortedPosts.length" class="empty-state">
-      还没有题解，点击右上角“新增题解”开始写第一篇。
+      还没有游记，点击右上角「新建游记」开始写第一篇。
     </div>
 
     <div v-else-if="!filteredPosts.length" class="empty-state">
