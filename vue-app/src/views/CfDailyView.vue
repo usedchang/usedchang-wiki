@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, nextTick } from "vue";
 import { pushToast } from "../utils/toast";
 
 const CF_HANDLE_KEY = "usedchang-cf-handle";
@@ -35,6 +35,13 @@ const dailySubmissions = computed(() =>
       item.creationTimeSeconds <= dayRange.value.endSec
   )
 );
+
+/** 所选自然日内的提交，按时间新→旧 */
+const dailySubmissionsSorted = computed(() =>
+  [...dailySubmissions.value].sort((a, b) => b.creationTimeSeconds - a.creationTimeSeconds)
+);
+
+const displayHandle = computed(() => handleInput.value.trim() || "（未填写）");
 
 const acceptedDailySubmissions = computed(() =>
   dailySubmissions.value.filter((item) => item.verdict === "OK")
@@ -204,6 +211,37 @@ function useHistoryHandle(handle) {
   loadCfData();
 }
 
+function problemUrl(problem) {
+  if (!problem) return "";
+  const cid = problem.contestId;
+  const idx = problem.index;
+  if (typeof cid === "number" && idx) {
+    return `https://codeforces.com/problemset/problem/${cid}/${idx}`;
+  }
+  return "";
+}
+
+function verdictLabel(verdict) {
+  if (verdict === "OK") return "AC";
+  return verdict || "—";
+}
+
+function verdictTone(verdict) {
+  if (verdict === "OK") return "cf-verdict-ac";
+  return "cf-verdict-other";
+}
+
+function formatSubmitTime(sec) {
+  return new Date(sec * 1000).toLocaleString("zh-CN", { hour12: false });
+}
+
+function selectHeatmapDay(key) {
+  selectedDate.value = key;
+  nextTick(() => {
+    document.getElementById("cf-day-detail")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
 onMounted(() => {
   const saved = localStorage.getItem(CF_HANDLE_KEY);
   if (saved) handleInput.value = saved;
@@ -276,16 +314,62 @@ onMounted(() => {
 
     <div class="panel">
       <h3 class="panel-title">最近 30 天提交热力图</h3>
+      <p class="cf-heatmap-hint">点击某一天，下方会列出该 handle 在当天的每一次提交（含未 AC）。</p>
       <div class="heatmap-grid">
-        <div
+        <button
           v-for="day in heatmapDays"
           :key="day.key"
+          type="button"
           class="heat-cell"
-          :class="`heat-level-${day.level}`"
-          :title="`${day.key}：${day.count} 次提交`"
+          :class="[`heat-level-${day.level}`, { 'heat-cell-selected': day.key === selectedDate }]"
+          :title="`${day.key}：${day.count} 次提交，点击查看当日明细`"
+          @click="selectHeatmapDay(day.key)"
         >
           {{ day.short }}
-        </div>
+        </button>
+      </div>
+    </div>
+
+    <div id="cf-day-detail" class="panel">
+      <h3 class="panel-title">{{ selectedDate }} · {{ displayHandle }} 当日提交</h3>
+      <p v-if="!dailySubmissionsSorted.length" class="empty-hint">该日无提交记录（或尚未加载数据）。</p>
+      <div v-else class="cf-day-table-wrap">
+        <table class="cf-day-table">
+          <thead>
+            <tr>
+              <th scope="col">时间</th>
+              <th scope="col">题目</th>
+              <th scope="col">结果</th>
+              <th scope="col">语言</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, idx) in dailySubmissionsSorted" :key="row.id ?? idx">
+              <td class="cf-day-time">{{ formatSubmitTime(row.creationTimeSeconds) }}</td>
+              <td>
+                <template v-if="row.problem">
+                  <a
+                    v-if="problemUrl(row.problem)"
+                    class="cf-day-prob-link"
+                    :href="problemUrl(row.problem)"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {{ row.problem.contestId }}{{ row.problem.index }} · {{ row.problem.name }}
+                  </a>
+                  <span v-else>{{ row.problem.name || "—" }}</span>
+                </template>
+                <span v-else>—</span>
+              </td>
+              <td>
+                <span class="cf-verdict" :class="verdictTone(row.verdict)">{{
+                  verdictLabel(row.verdict)
+                }}</span>
+              </td>
+              <td class="cf-day-lang">{{ row.programmingLanguage || "—" }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
