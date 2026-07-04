@@ -32,13 +32,31 @@ CREATE INDEX IF NOT EXISTS idx_comments_created   ON public.comments(created_at 
 -- 4. 自动创建 profile（用户注册时触发）
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
+DECLARE
+  base_name TEXT;
+  final_name TEXT;
+  counter INT := 0;
 BEGIN
-  INSERT INTO public.profiles (id, username)
-  VALUES (
-    NEW.id,
-    COALESCE(NEW.raw_user_meta_data ->> 'username', split_part(NEW.email, '@', 1))
-  )
-  ON CONFLICT (id) DO NOTHING;
+  base_name := COALESCE(
+    NEW.raw_user_meta_data ->> 'username',
+    split_part(NEW.email, '@', 1)
+  );
+
+  final_name := base_name;
+
+  -- 重名时追加随机后缀，避免 UNIQUE 冲突
+  LOOP
+    BEGIN
+      INSERT INTO public.profiles (id, username)
+      VALUES (NEW.id, final_name);
+      EXIT;
+    EXCEPTION
+      WHEN unique_violation THEN
+        counter := counter + 1;
+        final_name := base_name || '_' || to_hex(counter);
+    END;
+  END LOOP;
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
