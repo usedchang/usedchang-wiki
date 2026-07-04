@@ -2400,3 +2400,57 @@ textarea {
     padding-left: 8px;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   比赛经历卡片
+   ══════════════════════════════════════════════════════════════ */
+
+.contest-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.contest-card {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 20px 22px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+
+.contest-medal {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.contest-info {
+  min-width: 0;
+}
+
+.contest-info h3 {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+}
+
+.contest-award {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.contest-team {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+
+.contest-silver .contest-award {
+  color: #7b8c9e;
+}
+
+.contest-bronze .contest-award {
+  color: #b8860b;
+}

@@ -155,31 +155,25 @@ const latestPublishedJournals = computed(() =>
       <div class="section-title-row">
         <h2>比赛经历</h2>
       </div>
-      <div class="empty-state">
-        暂缺。未来会在这里更新 ICPC / CCPC / 省赛 / 比赛记录与总结。
+      <div class="contest-grid">
+        <article class="contest-card contest-silver">
+          <div class="contest-medal">🥈</div>
+          <div class="contest-info">
+            <h3>2026 贵州邀请赛</h3>
+            <p class="contest-award">银牌</p>
+            <p class="contest-team">队伍：炫彩猫猫</p>
+          </div>
+        </article>
+        <article class="contest-card contest-bronze">
+          <div class="contest-medal">🥉</div>
+          <div class="contest-info">
+            <h3>2026 浙江省赛</h3>
+            <p class="contest-award">铜牌</p>
+            <p class="contest-team">队伍：炫彩猫猫</p>
+          </div>
+        </article>
       </div>
     </section>
 
-    <section class="container section" id="backup" aria-label="本地数据备份">
-      <div class="section-title-row">
-        <h2>本地数据</h2>
-      </div>
-      <div class="panel home-backup-panel">
-        <p class="home-backup-desc">
-          当前无服务端，题解、游记与评论保存在本机浏览器。建议定期导出备份；更换设备或清理站点数据前务必先导出。
-        </p>
-        <div class="card-actions">
-          <button type="button" class="btn btn-primary" @click="onExportBackup">导出备份</button>
-          <button type="button" class="btn btn-ghost" @click="triggerImport">从文件恢复…</button>
-          <input
-            ref="backupInputRef"
-            type="file"
-            accept="application/json,.json"
-            class="home-backup-file"
-            @change="onBackupFileChange"
-          />
-        </div>
-      </div>
-    </section>
   </main>
 </template>
