@@ -161,7 +161,7 @@ const latestPublishedJournals = computed(() =>
           <div class="contest-info">
             <h3>2026 贵州邀请赛</h3>
             <p class="contest-award">银牌</p>
-            <p class="contest-team">队伍：三缺一</p>
+            <p class="contest-team">队伍：炫彩猫猫</p>
           </div>
         </article>
         <article class="contest-card contest-bronze">
@@ -169,7 +169,7 @@ const latestPublishedJournals = computed(() =>
           <div class="contest-info">
             <h3>2026 浙江省赛</h3>
             <p class="contest-award">铜牌</p>
-            <p class="contest-team">队伍：三缺一</p>
+            <p class="contest-team">队伍：炫彩猫猫</p>
           </div>
         </article>
       </div>
