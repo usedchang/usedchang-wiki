@@ -21,7 +21,7 @@ function escapeHtmlAttr(text) {
  */
 export function createMarkdownIt() {
   return new MarkdownIt({
-    html: true,
+    html: false,
     linkify: true,
     breaks: true,
     typographer: true,

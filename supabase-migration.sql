@@ -37,14 +37,15 @@ DECLARE
   final_name TEXT;
   counter INT := 0;
 BEGIN
+  -- 优先取用户自定义 username，否则生成随机默认名（避免泄露邮箱前缀）
   base_name := COALESCE(
     NEW.raw_user_meta_data ->> 'username',
-    split_part(NEW.email, '@', 1)
+    'user_' || substring(replace(gen_random_uuid()::text, '-', ''), 1, 8)
   );
 
   final_name := base_name;
 
-  -- 重名时追加随机后缀，避免 UNIQUE 冲突
+  -- 重名时追加后缀，最多重试 10 次避免死循环
   LOOP
     BEGIN
       INSERT INTO public.profiles (id, username)
@@ -53,7 +54,10 @@ BEGIN
     EXCEPTION
       WHEN unique_violation THEN
         counter := counter + 1;
-        final_name := base_name || '_' || to_hex(counter);
+        IF counter > 10 THEN
+          RAISE EXCEPTION '无法为用户 % 生成唯一用户名（已重试 % 次）', NEW.id, counter;
+        END IF;
+        final_name := base_name || '_' || substring(replace(gen_random_uuid()::text, '-', ''), 1, 4);
     END;
   END LOOP;
 
@@ -88,7 +92,8 @@ DROP POLICY IF EXISTS "comments_delete" ON public.comments;
 CREATE POLICY "comments_delete" ON public.comments
   FOR DELETE USING (auth.uid() = user_id);
 
--- 任何人都可读取 profile
+-- 公开可读 profile（anon key 本身公开，用于评论展示作者名）
+-- 注意：username 已在 handle_new_user 中改为随机生成，不泄露邮箱
 DROP POLICY IF EXISTS "profiles_read" ON public.profiles;
 CREATE POLICY "profiles_read" ON public.profiles
   FOR SELECT USING (true);

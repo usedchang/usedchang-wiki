@@ -1,31 +1,3 @@
-<<<<<<< HEAD
-# 依赖（不要提交！）
-node_modules/
-
-# 构建产物（每次 build 会自动生成）
-dist/
-
-# 环境变量（包含敏感信息）
-.env
-.env.local
-.env.*.local
-
-# IDE
-.vscode/
-.idea/
-
-# 日志
-npm-debug.log*
-yarn-debug.log*
-
-# 系统文件
-.DS_Store
-Thumbs.db
-
-# Vue
-*.code-workspace
-.history/
-=======
 # Logs
 logs
 *.log
@@ -112,16 +84,12 @@ dist
 
 # Gatsby files
 .cache/
-# Comment in the public line in if your project uses Gatsby and not Next.js
-# https://nextjs.org/blog/next-9-1#public-directory-support
-# public
 
 # vuepress build output
 .vuepress/dist
 
 # vuepress v2.x temp and cache directory
 .temp
-.cache
 
 # Sveltekit cache directory
 .svelte-kit/
@@ -165,9 +133,16 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
->>>>>>> ba05b25cc084ef3963d1473badb4423a943164ba
-node_modules/
-dist/
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+.history/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Reasonix
 .reasonix/
-.env
-main
