@@ -155,8 +155,23 @@ const latestPublishedJournals = computed(() =>
       <div class="section-title-row">
         <h2>比赛经历</h2>
       </div>
-      <div class="empty-state">
-        暂缺。未来会在这里更新 ICPC / CCPC / 省赛 / 比赛记录与总结。
+      <div class="contest-grid">
+        <article class="contest-card contest-silver">
+          <div class="contest-medal">🥈</div>
+          <div class="contest-info">
+            <h3>2026 贵州邀请赛</h3>
+            <p class="contest-award">银牌</p>
+            <p class="contest-team">队伍：三缺一</p>
+          </div>
+        </article>
+        <article class="contest-card contest-bronze">
+          <div class="contest-medal">🥉</div>
+          <div class="contest-info">
+            <h3>2026 浙江省赛</h3>
+            <p class="contest-award">铜牌</p>
+            <p class="contest-team">队伍：三缺一</p>
+          </div>
+        </article>
       </div>
     </section>
 
