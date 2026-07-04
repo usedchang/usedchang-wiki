@@ -175,26 +175,5 @@ const latestPublishedJournals = computed(() =>
       </div>
     </section>
 
-    <section class="container section" id="backup" aria-label="本地数据备份">
-      <div class="section-title-row">
-        <h2>本地数据</h2>
-      </div>
-      <div class="panel home-backup-panel">
-        <p class="home-backup-desc">
-          当前无服务端，题解、游记与评论保存在本机浏览器。建议定期导出备份；更换设备或清理站点数据前务必先导出。
-        </p>
-        <div class="card-actions">
-          <button type="button" class="btn btn-primary" @click="onExportBackup">导出备份</button>
-          <button type="button" class="btn btn-ghost" @click="triggerImport">从文件恢复…</button>
-          <input
-            ref="backupInputRef"
-            type="file"
-            accept="application/json,.json"
-            class="home-backup-file"
-            @change="onBackupFileChange"
-          />
-        </div>
-      </div>
-    </section>
   </main>
 </template>
