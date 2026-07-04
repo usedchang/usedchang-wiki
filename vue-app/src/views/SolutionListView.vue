@@ -1,19 +1,19 @@
 <script setup>
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import { createPost, getAllPosts, removePost, POST_KIND } from "../utils/postStorage";
+import { createPost, getAllPosts, removePost } from "../utils/postStorage";
 import { pushToast } from "../utils/toast";
 
 const router = useRouter();
-const posts = ref(getAllPosts().filter((p) => p.kind !== POST_KIND.journal));
+const posts = ref(getAllPosts());
 const keyword = ref("");
 const selectedTag = ref("all");
 const selectedStatus = ref("all");
 const sortBy = ref("updatedAt-desc");
 
 function createSolution() {
-  const post = createPost({ kind: POST_KIND.solution });
-  posts.value = getAllPosts().filter((p) => p.kind !== POST_KIND.journal);
+  const post = createPost();
+  posts.value = getAllPosts();
   pushToast("已新建题解草稿", "success");
   router.push(`/solutions/${post.id}`);
 }
@@ -21,7 +21,7 @@ function createSolution() {
 function removeSolution(id) {
   const target = posts.value.find((item) => item.id === id);
   removePost(id);
-  posts.value = getAllPosts().filter((p) => p.kind !== POST_KIND.journal);
+  posts.value = getAllPosts();
   pushToast(`已删除：${target?.title || "未命名题解"}`, "info");
 }
 

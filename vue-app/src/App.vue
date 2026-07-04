@@ -1,7 +1,6 @@
 <script setup>
 import { computed, onErrorCaptured, onMounted, onUnmounted, ref, watch } from "vue";
 import { removeToast, toastList } from "./utils/toast";
-import { applyHljsStylesheet } from "./utils/hljsTheme";
 
 const THEME_KEY = "usedchang-theme";
 const theme = ref("academic");
@@ -36,7 +35,6 @@ onMounted(() => {
     theme.value = saved;
   }
   applyTheme(theme.value);
-  applyHljsStylesheet(theme.value);
   document.addEventListener("click", handleOutsideClick);
 });
 
@@ -47,7 +45,6 @@ onUnmounted(() => {
 watch(theme, (value) => {
   localStorage.setItem(THEME_KEY, value);
   applyTheme(value);
-  applyHljsStylesheet(value);
 });
 
 function toggleThemeMenu() {
@@ -81,7 +78,6 @@ onErrorCaptured((error) => {
           <li><RouterLink to="/study-plan">学习计划</RouterLink></li>
           <li><RouterLink to="/cf-daily">CF统计</RouterLink></li>
           <li><RouterLink to="/solutions">题解编辑</RouterLink></li>
-          <li><RouterLink to="/journal">游记</RouterLink></li>
           <li><RouterLink to="/friends">友链</RouterLink></li>
         </ul>
         <div class="theme-switcher" ref="themeSwitcherRef">

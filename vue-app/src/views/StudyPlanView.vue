@@ -56,11 +56,6 @@ const activeWeek = computed(
 );
 const todos = computed(() => activeWeek.value?.todos || []);
 const doneCount = computed(() => todos.value.filter((item) => item.done).length);
-const progressPercent = computed(() => {
-  const n = todos.value.length;
-  if (!n) return 0;
-  return Math.round((doneCount.value / n) * 100);
-});
 
 function switchWeek(id) {
   state.value.activeWeekId = id;
@@ -100,139 +95,70 @@ function removeTodo(id) {
 
 <template>
   <main class="container section plan-page">
-    <header class="plan-hero">
-      <div class="plan-hero-text">
-        <h2 class="plan-hero-title">学习计划</h2>
-        <p class="plan-hero-desc">按周记录刷题，完成一项勾一项。</p>
-      </div>
-      <div
-        class="plan-progress"
-        role="img"
-        :aria-label="`本周进度 ${doneCount} 题已完成，共 ${todos.length} 题`"
-      >
-        <div
-          class="plan-progress-ring"
-          :style="{ '--plan-p': String(progressPercent) }"
-        />
-        <div class="plan-progress-meta">
-          <span class="plan-progress-value">{{ doneCount }}/{{ todos.length }}</span>
-          <span class="plan-progress-label">本周完成</span>
-        </div>
-      </div>
-    </header>
+    <div class="section-title-row">
+      <h2>学习计划 To-Do（按周）</h2>
+      <span class="plan-count">本周完成：{{ doneCount }}/{{ todos.length }}</span>
+    </div>
 
-    <section class="panel plan-week-panel" aria-label="选择周次">
-      <div class="plan-week-head">
-        <h3 class="plan-week-heading">周次</h3>
-        <button type="button" class="btn btn-primary plan-week-action" @click="addCurrentWeek">
-          跳到本周
-        </button>
-      </div>
-      <div class="plan-week-scroll">
+    <div class="panel week-tabs">
+      <div class="week-tab-list">
         <button
           v-for="week in weeks"
           :key="week.id"
-          type="button"
-          class="plan-week-pill"
-          :class="{ 'plan-week-pill-active': week.id === activeWeek.id }"
+          class="btn week-tab"
+          :class="{ 'week-tab-active': week.id === activeWeek.id }"
           @click="switchWeek(week.id)"
         >
           {{ week.label }}
         </button>
       </div>
-    </section>
+      <button class="btn btn-primary" @click="addCurrentWeek">切换/创建本周</button>
+    </div>
 
-    <section class="panel plan-add-panel" aria-label="添加题目">
-      <h3 class="panel-title plan-add-title">添加题目</h3>
-      <div class="plan-form">
-        <div class="plan-field">
-          <label class="plan-label" for="plan-oj">OJ</label>
-          <select id="plan-oj" v-model="todoForm.oj" class="plan-input">
-            <option>Codeforces</option>
-            <option>AtCoder</option>
-            <option>Luogu</option>
-            <option>Other</option>
-          </select>
-        </div>
-        <div class="plan-field">
-          <label class="plan-label" for="plan-pid">题号</label>
-          <input
-            id="plan-pid"
-            v-model="todoForm.problemId"
-            class="plan-input"
-            placeholder="例如 1941A"
-            autocomplete="off"
-          />
-        </div>
-        <div class="plan-field plan-field-span">
-          <label class="plan-label" for="plan-title">标题 <span class="plan-req">*</span></label>
-          <input
-            id="plan-title"
-            v-model="todoForm.title"
-            class="plan-input"
-            placeholder="题目标题"
-            autocomplete="off"
-          />
-        </div>
-        <div class="plan-field plan-field-span">
-          <label class="plan-label" for="plan-link">链接</label>
-          <input
-            id="plan-link"
-            v-model="todoForm.link"
-            class="plan-input"
-            placeholder="可选，便于一键打开题目页"
-            autocomplete="off"
-          />
-        </div>
+    <div class="panel">
+      <h3 class="panel-title">新增题单任务</h3>
+      <div class="form-grid">
+        <select v-model="todoForm.oj">
+          <option>Codeforces</option>
+          <option>AtCoder</option>
+          <option>Luogu</option>
+          <option>Other</option>
+        </select>
+        <input v-model="todoForm.problemId" placeholder="题号，如 1941A" />
+        <input v-model="todoForm.title" placeholder="题目标题（必填）" />
       </div>
-      <div class="plan-form-footer">
-        <button type="button" class="btn btn-primary" @click="addTodo">加入本周列表</button>
+      <input v-model="todoForm.link" placeholder="题目链接（可选）" />
+      <div class="card-actions">
+        <button class="btn btn-primary" @click="addTodo">添加到本周 To-Do</button>
       </div>
-    </section>
+    </div>
 
-    <section class="plan-tasks-section" aria-label="本周任务列表">
-      <h3 class="plan-tasks-heading">本周任务</h3>
-      <div class="plan-list-wrap">
-        <article
-          v-for="item in todos"
-          :key="item.id"
-          class="plan-task-card"
-          :data-done="item.done ? '1' : '0'"
-        >
-          <label class="plan-task-main">
-            <input
-              class="plan-task-check"
-              type="checkbox"
-              :checked="item.done"
-              @change="toggleDone(item.id)"
-            />
-            <div class="plan-task-body">
-              <span class="plan-task-badge">{{ item.oj }}</span>
-              <p class="plan-task-title" :class="{ 'plan-task-title-done': item.done }">
-                <span class="plan-task-id">{{ item.problemId || "—" }}</span>
-                {{ item.title }}
-              </p>
-            </div>
-          </label>
-          <div class="plan-task-actions">
-            <a
-              v-if="item.link"
-              class="btn btn-ghost plan-task-link"
-              :href="item.link"
-              target="_blank"
-              rel="noreferrer"
-            >
-              打开
-            </a>
-            <button type="button" class="btn btn-danger plan-task-del" @click="removeTodo(item.id)">
-              删除
-            </button>
+    <div class="plan-list-wrap">
+      <article v-for="item in todos" :key="item.id" class="plan-card todo-item">
+        <label class="todo-main">
+          <input type="checkbox" :checked="item.done" @change="toggleDone(item.id)" />
+          <div>
+            <p class="todo-title" :class="{ 'todo-done': item.done }">
+              [{{ item.oj }}] {{ item.problemId || "未填题号" }} - {{ item.title }}
+            </p>
           </div>
-        </article>
-        <div v-if="!todos.length" class="empty-state plan-empty">
-          本周还没有任务。先在上方填好题目，点「加入本周列表」即可开始打卡。
+        </label>
+        <div class="todo-right">
+          <a
+            v-if="item.link"
+            class="btn btn-ghost"
+            :href="item.link"
+            target="_blank"
+            rel="noreferrer"
+          >
+            题目链接
+          </a>
+          <button class="btn btn-danger" @click="removeTodo(item.id)">删除</button>
         </div>
+      </article>
+      <div v-if="!todos.length" class="empty-state">
+        当前周还没有任务，先加几道题，做完就勾选打卡。
       </div>
-    </section>
+    </div>
   </main>
 </template>

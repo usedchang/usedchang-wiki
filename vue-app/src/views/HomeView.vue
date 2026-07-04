@@ -1,51 +1,12 @@
 <script setup>
-import { computed, ref } from "vue";
-import { getAllPosts, POST_KIND } from "../utils/postStorage";
-import { exportSiteData, importSiteDataFromFile } from "../utils/siteBackup";
-import { pushToast } from "../utils/toast";
+import { computed } from "vue";
+import { getAllPosts } from "../utils/postStorage";
 
 const avatarUrl = "/images/avatar-usedchang.png";
-const backupInputRef = ref(null);
 
-function triggerImport() {
-  backupInputRef.value?.click();
-}
-
-function onExportBackup() {
-  try {
-    exportSiteData();
-    pushToast("已下载备份文件", "success");
-  } catch (e) {
-    pushToast(e?.message || "导出失败", "error", 3200);
-  }
-}
-
-async function onBackupFileChange(ev) {
-  const file = ev.target?.files?.[0];
-  ev.target.value = "";
-  if (!file) return;
-  if (!confirm("导入将覆盖当前浏览器内所有本地文章与评论，且不可撤销。确定继续？")) return;
-  try {
-    await importSiteDataFromFile(file);
-    pushToast("导入成功，即将刷新页面", "success");
-    window.setTimeout(() => window.location.reload(), 900);
-  } catch (e) {
-    pushToast(e?.message || "导入失败", "error", 4000);
-  }
-}
-
-const latestPublishedSolutions = computed(() =>
+const latestPublishedPosts = computed(() =>
   getAllPosts()
-    .filter(
-      (post) => post.status === "published" && post.kind !== POST_KIND.journal
-    )
-    .sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
-    .slice(0, 3)
-);
-
-const latestPublishedJournals = computed(() =>
-  getAllPosts()
-    .filter((post) => post.status === "published" && post.kind === POST_KIND.journal)
+    .filter((post) => post.status === "published")
     .sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
     .slice(0, 3)
 );
@@ -76,43 +37,20 @@ const latestPublishedJournals = computed(() =>
         </div>
       </div>
       <div class="hero-actions">
-        <a
-          class="btn btn-primary"
-          href="https://www.cnblogs.com/usedchang"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          老博客地址（博客园）
-        </a>
+        <a class="btn btn-primary" href="#solutions">查看最新题解</a>
+        <RouterLink class="btn btn-ghost" to="/study-plan">进入学习计划</RouterLink>
+        <RouterLink class="btn btn-ghost" to="/cf-daily">查看 CF 每日统计</RouterLink>
+        <RouterLink class="btn btn-ghost" to="/solutions">写题解</RouterLink>
       </div>
-    </section>
-
-    <section class="container section" id="journal">
-      <div class="section-title-row">
-        <h2>最新游记</h2>
-      </div>
-      <div v-if="latestPublishedJournals.length" class="card-grid">
-        <article v-for="item in latestPublishedJournals" :key="item.id" class="card">
-          <p class="card-meta">
-            游记 · {{ item.tags?.length ? item.tags.join(" / ") : "未打标签" }}
-          </p>
-          <h3>
-            <RouterLink :to="`/posts/${item.id}`">
-              {{ item.title || "未命名游记" }}
-            </RouterLink>
-          </h3>
-          <p>{{ item.summary || "暂无摘要，点击阅读全文（支持评论）。" }}</p>
-        </article>
-      </div>
-      <div v-else class="empty-state">还没有已发布游记，到「游记」里写一篇并发布吧。</div>
     </section>
 
     <section class="container section" id="solutions">
       <div class="section-title-row">
         <h2>最新题解</h2>
+        <RouterLink class="section-link" to="/solutions">查看全部</RouterLink>
       </div>
-      <div v-if="latestPublishedSolutions.length" class="card-grid">
-        <article v-for="item in latestPublishedSolutions" :key="item.id" class="card">
+      <div v-if="latestPublishedPosts.length" class="card-grid">
+        <article v-for="item in latestPublishedPosts" :key="item.id" class="card">
           <p class="card-meta">
             题解 · {{ item.tags?.length ? item.tags.join(" / ") : "未分类" }}
           </p>
@@ -147,28 +85,6 @@ const latestPublishedJournals = computed(() =>
       </div>
       <div class="empty-state">
         暂缺。未来会在这里更新 ICPC / CCPC / 省赛 / 比赛记录与总结。
-      </div>
-    </section>
-
-    <section class="container section" id="backup" aria-label="本地数据备份">
-      <div class="section-title-row">
-        <h2>本地数据</h2>
-      </div>
-      <div class="panel home-backup-panel">
-        <p class="home-backup-desc">
-          当前无服务端，题解、游记与评论保存在本机浏览器。建议定期导出备份；更换设备或清理站点数据前务必先导出。
-        </p>
-        <div class="card-actions">
-          <button type="button" class="btn btn-primary" @click="onExportBackup">导出备份</button>
-          <button type="button" class="btn btn-ghost" @click="triggerImport">从文件恢复…</button>
-          <input
-            ref="backupInputRef"
-            type="file"
-            accept="application/json,.json"
-            class="home-backup-file"
-            @change="onBackupFileChange"
-          />
-        </div>
       </div>
     </section>
   </main>
