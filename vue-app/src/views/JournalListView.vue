@@ -1,33 +1,57 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { createPost, getAllPosts, removePost, POST_KIND } from "../utils/postStorage";
 import { pushToast } from "../utils/toast";
 
 const router = useRouter();
-const posts = ref(getAllPosts().filter((p) => p.kind === POST_KIND.journal));
+const posts = ref([]);
+const loading = ref(true);
+const loadError = ref("");
 const keyword = ref("");
 const selectedTag = ref("all");
 const selectedStatus = ref("all");
 const sortBy = ref("updatedAt-desc");
 
-function refreshList() {
-  posts.value = getAllPosts().filter((p) => p.kind === POST_KIND.journal);
+async function refreshList() {
+  loading.value = true;
+  loadError.value = "";
+  try {
+    posts.value = (await getAllPosts({ includeDrafts: true })).filter(
+      (p) => p.kind === POST_KIND.journal
+    );
+  } catch (error) {
+    loadError.value = error?.message || "读取游记失败";
+    posts.value = [];
+  } finally {
+    loading.value = false;
+  }
 }
 
-function createJournal() {
-  const post = createPost({ kind: POST_KIND.journal });
-  refreshList();
-  pushToast("已新建游记草稿", "success");
-  router.push(`/journal/${post.id}`);
+async function createJournal() {
+  try {
+    const post = await createPost({ kind: POST_KIND.journal });
+    await refreshList();
+    pushToast("已新建游记草稿", "success");
+    router.push("/admin/journal/" + post.id);
+  } catch (error) {
+    pushToast(error?.message || "新建游记失败", "error", 3200);
+  }
 }
 
-function removeJournal(id) {
+async function removeJournal(id) {
   const target = posts.value.find((item) => item.id === id);
-  removePost(id);
-  refreshList();
-  pushToast(`已删除：${target?.title || "未命名游记"}`, "info");
+  if (!confirm("确定删除“" + (target?.title || "未命名游记") + "”吗？")) return;
+  try {
+    await removePost(id);
+    await refreshList();
+    pushToast("已删除：" + (target?.title || "未命名游记"), "info");
+  } catch (error) {
+    pushToast(error?.message || "删除失败", "error", 3200);
+  }
 }
+
+onMounted(refreshList);
 
 const sortedPosts = computed(() => {
   const list = [...posts.value];
@@ -117,6 +141,9 @@ function formatTime(ts) {
       </div>
     </section>
 
+    <p v-if="loadError" class="auth-error">{{ loadError }}</p>
+    <p v-else-if="loading" class="comment-status">正在读取游记...</p>
+
     <section class="panel">
       <h3 class="panel-title">草稿（{{ draftPosts.length }}）</h3>
       <div v-if="draftPosts.length" class="solution-list">
@@ -128,7 +155,7 @@ function formatTime(ts) {
           </div>
           <div class="card-actions">
             <RouterLink class="btn btn-ghost" :to="`/posts/${item.id}`">阅读</RouterLink>
-            <RouterLink class="btn btn-ghost" :to="`/journal/${item.id}`">编辑</RouterLink>
+            <RouterLink class="btn btn-ghost" :to="`/admin/journal/${item.id}`">编辑</RouterLink>
             <button class="btn btn-danger" @click="removeJournal(item.id)">删除</button>
           </div>
         </article>
@@ -149,7 +176,7 @@ function formatTime(ts) {
           </div>
           <div class="card-actions">
             <RouterLink class="btn btn-ghost" :to="`/posts/${item.id}`">阅读</RouterLink>
-            <RouterLink class="btn btn-ghost" :to="`/journal/${item.id}`">编辑</RouterLink>
+            <RouterLink class="btn btn-ghost" :to="`/admin/journal/${item.id}`">编辑</RouterLink>
             <button class="btn btn-danger" @click="removeJournal(item.id)">删除</button>
           </div>
         </article>

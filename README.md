@@ -28,6 +28,12 @@ npm run dev
 npm run build
 ```
 
+## 生产部署
+
+生产环境请先在 Supabase 执行 [`supabase-migration.sql`](./supabase-migration.sql)，再配置 `vue-app/.env.local` 中的 `VITE_SUPABASE_URL` 和 `VITE_SUPABASE_ANON_KEY`。文章、评论、用户资料和图片会保存到 Supabase；未配置时仅作为本地写作降级，不能用于多设备发布。
+
+上线前还需在 Supabase Auth 中启用邮箱密码登录，并将正式域名下的 `/auth/callback` 与 `/reset-password` 加入回调白名单。管理员角色只能通过可信的数据库管理端设置；密码只由 Supabase Auth 保存，不要给 `profiles` 增加密码字段，也不要把 `service_role` key 放入任何 `VITE_*` 变量。
+
 ## 项目结构
 
 ```
@@ -43,9 +49,12 @@ vue-app/
 ## 功能特性
 
 - 主页展示最新题解
+- 公开题解归档（搜索、标签筛选）与沉浸式阅读页（目录、进度、相邻文章）
 - 学习计划页面
 - Codeforces 统计
-- 题解编辑与发布
+- 题解/游记编辑与发布（实时 Markdown 预览、.md 导入导出、图片上传）
+- Supabase 邮箱 + 自设密码登录、找回密码、普通用户/管理员分权
+- 嵌套评论与 Realtime 实时同步
 - 多主题切换（Academic / Modern / 深色 / 护眼）
 
 ## 许可证

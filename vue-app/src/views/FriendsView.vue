@@ -8,7 +8,7 @@ const friends = [
   },
   {
     name: "Silencer76",
-    url: "http://www.silencer76.com/",
+    url: "https://www.silencer76.com/",
     description: "76的编程小屋",
     avatar: "/images/Silencer76.jpg"
   }
@@ -39,12 +39,13 @@ const friends = [
         </div>
       </a>
     </div>
+
   </main>
 </template>
 
 <style scoped>
 .section-desc {
-  color: var(--text-secondary);
+  color: var(--text-soft);
   margin-bottom: 2rem;
 }
 
@@ -89,7 +90,7 @@ const friends = [
 
 .friend-info p {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--text-soft);
   font-size: 0.875rem;
 }
 </style>

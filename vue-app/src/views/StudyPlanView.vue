@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, watch } from "vue";
+import { getSafeExternalUrl } from "../utils/urlSafety";
 
 const STORAGE_KEY = "usedchang-weekly-todos";
 
@@ -216,11 +217,11 @@ function removeTodo(id) {
           </label>
           <div class="plan-task-actions">
             <a
-              v-if="item.link"
+              v-if="getSafeExternalUrl(item.link)"
               class="btn btn-ghost plan-task-link"
-              :href="item.link"
+              :href="getSafeExternalUrl(item.link)"
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
             >
               打开
             </a>

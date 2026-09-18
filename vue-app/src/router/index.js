@@ -1,7 +1,9 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { SITE_TITLE } from "../constants";
 import NotFoundView from "../views/NotFoundView.vue";
-import { supabase } from "../utils/supabase";
+import { supabase, supabaseConfigured } from "../utils/supabase";
+import { checkIsAdmin } from "../composables/usePermission";
+import { getSafeNextPath } from "../utils/authNavigation";
 
 const routes = [
   { path: "/", name: "home", component: () => import("../views/HomeView.vue"), meta: { title: "首页" } },
@@ -26,24 +28,46 @@ const routes = [
   {
     path: "/solutions",
     name: "solutions",
+    component: () => import("../views/SolutionArchiveView.vue"),
+    meta: { title: "题解归档" },
+  },
+  {
+    path: "/solutions/:id",
+    redirect: (to) => ({ name: "admin-solution-editor", params: { id: to.params.id } }),
+  },
+  {
+    path: "/admin",
+    redirect: { name: "admin-solutions" },
+  },
+  {
+    path: "/admin/solutions",
+    name: "admin-solutions",
     component: () => import("../views/SolutionListView.vue"),
     meta: { title: "题解管理", requiresAdmin: true },
   },
   {
-    path: "/solutions/:id",
-    name: "solution-editor",
+    path: "/admin/solutions/:id",
+    name: "admin-solution-editor",
     component: () => import("../views/SolutionEditorView.vue"),
     meta: { title: "编辑题解", articleKind: "solution", requiresAdmin: true },
   },
   {
     path: "/journal",
-    name: "journal",
-    component: () => import("../views/JournalListView.vue"),
-    meta: { title: "游记", requiresAdmin: true },
+    redirect: { name: "admin-journal" },
   },
   {
     path: "/journal/:id",
-    name: "journal-editor",
+    redirect: (to) => ({ name: "admin-journal-editor", params: { id: to.params.id } }),
+  },
+  {
+    path: "/admin/journal",
+    name: "admin-journal",
+    component: () => import("../views/JournalListView.vue"),
+    meta: { title: "游记管理", requiresAdmin: true },
+  },
+  {
+    path: "/admin/journal/:id",
+    name: "admin-journal-editor",
     component: () => import("../views/SolutionEditorView.vue"),
     meta: { title: "编辑游记", articleKind: "journal", requiresAdmin: true },
   },
@@ -58,6 +82,30 @@ const routes = [
     name: "friends",
     component: () => import("../views/FriendsView.vue"),
     meta: { title: "友链" },
+  },
+  {
+    path: "/login",
+    name: "login",
+    component: () => import("../views/LoginView.vue"),
+    meta: { title: "登录" },
+  },
+  {
+    path: "/auth/callback",
+    name: "auth-callback",
+    component: () => import("../views/AuthCallbackView.vue"),
+    meta: { title: "账号验证" },
+  },
+  {
+    path: "/reset-password",
+    name: "reset-password",
+    component: () => import("../views/ResetPasswordView.vue"),
+    meta: { title: "重置密码" },
+  },
+  {
+    path: "/403",
+    name: "forbidden",
+    component: () => import("../views/ForbiddenView.vue"),
+    meta: { title: "没有权限" },
   },
   { path: "/404", name: "not-found", component: NotFoundView, meta: { title: "页面不存在" } },
   { path: "/:pathMatch(.*)*", redirect: "/404" },
@@ -76,16 +124,18 @@ const router = createRouter({
 // ── 权限守卫：非 admin 用户无法访问管理页面 ──
 router.beforeEach(async (to) => {
   if (to.meta.requiresAdmin) {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return "/";
+    // 本地降级只服务于开发写作；生产构建缺少后端配置时仍然拒绝管理访问。
+    if (import.meta.env.DEV && !supabaseConfigured) return true;
+    const { data: { session }, error } = await supabase.auth.getSession();
+    const next = getSafeNextPath(to.fullPath);
+    if (error || !session) return { name: "login", query: { next } };
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", session.user.id)
-      .single();
-
-    if (profile?.role !== "admin") return "/";
+    try {
+      if (!(await checkIsAdmin())) return { name: "forbidden", query: { next } };
+    } catch (permissionError) {
+      console.warn(permissionError?.message || "管理员权限校验失败");
+      return { name: "forbidden", query: { next } };
+    }
   }
 });
 

@@ -1,0 +1,17 @@
+{
+  "name": "usedchang wiki",
+  "short_name": "usedchang",
+  "description": "usedchang 的算法笔记、Codeforces 统计、Markdown 题解与游记",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1a1a2e",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "lang": "zh-CN"
+}

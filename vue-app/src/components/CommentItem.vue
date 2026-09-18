@@ -1,7 +1,8 @@
 <script setup>
 import { ref } from "vue";
 import { useAuth } from "../composables/useAuth";
-import { addReply, deleteComment } from "../composables/useComments";
+import { usePermission } from "../composables/usePermission";
+import { addReply, deleteComment, MAX_COMMENT_LENGTH } from "../composables/useComments";
 
 const props = defineProps({
   comment: { type: Object, required: true },
@@ -9,13 +10,15 @@ const props = defineProps({
   postId: { type: String, required: true },
 });
 
-const emit = defineEmits(["needLogin", "deleted"]);
+const emit = defineEmits(["needLogin", "changed"]);
 
 const { user } = useAuth();
+const { isAdmin } = usePermission();
 
 const replyOpen = ref(false);
 const replyContent = ref("");
 const submitting = ref(false);
+const deleting = ref(false);
 const error = ref("");
 
 const maxDepth = 3;
@@ -26,6 +29,7 @@ function formatTime(ts) {
 }
 
 function getAuthorName(comment) {
+  if (comment.is_deleted) return "已删除";
   return comment.profiles?.username || "匿名用户";
 }
 
@@ -35,6 +39,10 @@ function getInitial(comment) {
 
 function isOwn(comment) {
   return user.value && user.value.id === comment.user_id;
+}
+
+function canDelete(comment) {
+  return !comment.is_deleted && (isAdmin.value || isOwn(comment));
 }
 
 function toggleReply() {
@@ -55,6 +63,8 @@ async function handleReply() {
     await addReply(props.postId, user.value.id, props.comment.id, replyContent.value.trim());
     replyOpen.value = false;
     replyContent.value = "";
+    // Realtime 不可用时也能立即看到新回复。
+    emit("changed");
   } catch (e) {
     error.value = e.message || "回复失败";
   } finally {
@@ -63,12 +73,17 @@ async function handleReply() {
 }
 
 async function handleDelete() {
+  if (deleting.value) return;
   if (!confirm("确定要删除这条评论吗？")) return;
+  deleting.value = true;
+  error.value = "";
   try {
     await deleteComment(props.comment.id);
-    emit("deleted");
+    emit("changed");
   } catch (e) {
     error.value = e.message || "删除失败";
+  } finally {
+    deleting.value = false;
   }
 }
 </script>
@@ -81,23 +96,28 @@ async function handleDelete() {
         <span class="comment-author">{{ getAuthorName(comment) }}</span>
         <span class="comment-time">{{ formatTime(comment.created_at) }}</span>
       </div>
-      <div class="comment-content">{{ comment.content }}</div>
+      <div class="comment-content" :class="{ 'comment-content-deleted': comment.is_deleted }">
+        {{ comment.is_deleted ? "该评论已删除" : comment.content }}
+      </div>
       <div class="comment-actions">
         <button
-          v-if="depth < maxDepth"
+          v-if="!comment.is_deleted && depth < maxDepth"
           class="comment-action-btn"
           @click="toggleReply"
         >
           {{ replyOpen ? "取消回复" : "回复" }}
         </button>
         <button
-          v-if="isOwn(comment)"
+          v-if="canDelete(comment)"
           class="comment-action-btn comment-action-danger"
+          :disabled="deleting"
           @click="handleDelete"
         >
-          删除
+          {{ deleting ? "删除中..." : "删除" }}
         </button>
       </div>
+
+      <p v-if="error" class="auth-error">{{ error }}</p>
 
       <!-- 内联回复表单 -->
       <div v-if="replyOpen" class="reply-form">
@@ -105,10 +125,10 @@ async function handleDelete() {
           v-model="replyContent"
           class="form-textarea"
           rows="2"
+          :maxlength="MAX_COMMENT_LENGTH"
           placeholder="写下您的回复..."
           :disabled="submitting"
         ></textarea>
-        <p v-if="error" class="auth-error">{{ error }}</p>
         <button
           class="btn btn-primary btn-sm"
           :disabled="!replyContent.trim() || submitting"
@@ -127,7 +147,7 @@ async function handleDelete() {
           :depth="depth + 1"
           :postId="postId"
           @need-login="emit('needLogin')"
-          @deleted="emit('deleted')"
+          @changed="emit('changed')"
         />
       </div>
     </div>

@@ -3,12 +3,18 @@
  *
  * 使用方式（在浏览器控制台或开发环境页面中调用）：
  *   1. 确保已登录 Supabase
- *   2. await migrateCommentsToSupabase()
+ *   2. await migrateComments()
  */
 
-import { supabase } from "./supabase";
+import { supabase, supabaseConfigured } from "./supabase";
 
 const OLD_STORAGE_KEY = "usedchang-comments";
+const MAX_COMMENT_LENGTH = 5000;
+
+function normalizeContent(value) {
+  const content = String(value ?? "").trim().slice(0, MAX_COMMENT_LENGTH);
+  return content || "(无内容)";
+}
 
 /**
  * 读取 localStorage 中的旧评论
@@ -26,10 +32,13 @@ function readOldComments() {
 
 /**
  * 将旧评论迁移到 Supabase
- * @param {string} userId - 当前登录用户的 Supabase UUID
  * @returns {Promise<{ migrated: number; skipped: number; errors: string[] }>}
  */
-export async function migrateComments(userId) {
+export async function migrateComments() {
+  if (!supabaseConfigured) throw new Error("请先配置 Supabase 环境变量");
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) throw new Error("迁移评论前请先登录");
+  const userId = userData.user.id;
   const old = readOldComments();
   if (old.length === 0) {
     return { migrated: 0, skipped: 0, errors: ["本地没有旧评论数据"] };
@@ -47,9 +56,7 @@ export async function migrateComments(userId) {
         .insert({
           post_id: comment.postId,
           user_id: userId,
-          content: comment.content || "(无内容)",
-          created_at: new Date(comment.createdAt || Date.now()).toISOString(),
-          is_deleted: false,
+          content: normalizeContent(comment.content),
         })
         .select("id")
         .single();
@@ -70,9 +77,7 @@ export async function migrateComments(userId) {
               post_id: comment.postId,
               user_id: userId,
               parent_id: parent.id,
-              content: reply.content || "(无内容)",
-              created_at: new Date(reply.createdAt || Date.now()).toISOString(),
-              is_deleted: false,
+              content: normalizeContent(reply.content),
             });
 
             if (replyErr) {

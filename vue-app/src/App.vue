@@ -1,11 +1,11 @@
 <script setup>
 import { computed, onErrorCaptured, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { removeToast, toastList } from "./utils/toast";
+import { pushToast, removeToast, toastList } from "./utils/toast";
 import { applyHljsStylesheet } from "./utils/hljsTheme";
 import { useAuth } from "./composables/useAuth";
 import { usePermission } from "./composables/usePermission";
-import AuthModal from "./components/AuthModal.vue";
+import { supabaseConfigured } from "./utils/supabase";
 
 const THEME_KEY = "usedchang-theme";
 const theme = ref("academic");
@@ -26,12 +26,26 @@ const currentTheme = computed(
 );
 const appError = ref("");
 
-const { user, authModalOpen, openAuthModal, signOut, closeAuthModal } = useAuth();
+const { user, signOut } = useAuth();
 const { isAdmin } = usePermission();
+const canManage = computed(() => isAdmin.value || (import.meta.env.DEV && !supabaseConfigured));
 const router = useRouter();
 const themeSwitcherRef = ref(null);
 const navDropdownOpen = ref(false);
 const navDropdownRef = ref(null);
+const mobileNavOpen = ref(false);
+const mobileNavToggleRef = ref(null);
+const headerNavRef = ref(null);
+const loginTarget = computed(() => {
+  const current = router.currentRoute.value.fullPath;
+  return {
+    name: "login",
+    query: current === "/" ? {} : { next: current },
+  };
+});
+const userLabel = computed(
+  () => user.value?.user_metadata?.username || user.value?.email?.split("@")[0] || "已登录"
+);
 
 function toggleNavDropdown() {
   if (navDropdownOpen.value) {
@@ -48,6 +62,15 @@ function handleOutsideClick(event) {
   }
   if (navDropdownOpen.value && navDropdownRef.value && !navDropdownRef.value.contains(event.target)) {
     navDropdownOpen.value = false;
+  }
+  if (
+    mobileNavOpen.value
+    && headerNavRef.value
+    && mobileNavToggleRef.value
+    && !headerNavRef.value.contains(event.target)
+    && !mobileNavToggleRef.value.contains(event.target)
+  ) {
+    mobileNavOpen.value = false;
   }
 }
 
@@ -71,6 +94,15 @@ watch(theme, (value) => {
   applyHljsStylesheet(value);
 });
 
+watch(
+  () => router.currentRoute.value.fullPath,
+  () => {
+    mobileNavOpen.value = false;
+    navDropdownOpen.value = false;
+    expanded.value = false;
+  }
+);
+
 function toggleThemeMenu() {
   expanded.value = !expanded.value;
 }
@@ -86,6 +118,16 @@ function resetAppError() {
   appError.value = "";
 }
 
+async function handleSignOut() {
+  try {
+    const wasAdminPage = Boolean(router.currentRoute.value.meta.requiresAdmin);
+    await signOut();
+    if (wasAdminPage) await router.replace("/");
+  } catch (error) {
+    pushToast(error?.message || "退出失败，请稍后重试", "error", 3200);
+  }
+}
+
 onErrorCaptured((error) => {
   appError.value = error instanceof Error ? error.message : "页面渲染异常";
   return false;
@@ -96,7 +138,25 @@ onErrorCaptured((error) => {
   <header class="site-header">
     <div class="container header-inner">
       <RouterLink class="brand" to="/">usedchang</RouterLink>
-      <nav class="header-nav" aria-label="主导航">
+      <button
+        ref="mobileNavToggleRef"
+        type="button"
+        class="mobile-nav-toggle"
+        :class="{ 'mobile-nav-toggle-open': mobileNavOpen }"
+        :aria-expanded="mobileNavOpen"
+        aria-controls="site-navigation"
+        aria-label="切换主导航"
+        @click="mobileNavOpen = !mobileNavOpen"
+      >
+        <span></span><span></span><span></span>
+      </button>
+      <nav
+        id="site-navigation"
+        ref="headerNavRef"
+        class="header-nav"
+        :class="{ 'mobile-nav-open': mobileNavOpen }"
+        aria-label="主导航"
+      >
         <ul class="nav-list">
           <li><RouterLink to="/">主页</RouterLink></li>
           <li class="nav-dropdown" ref="navDropdownRef">
@@ -115,17 +175,18 @@ onErrorCaptured((error) => {
             </ul>
           </li>
           <li><RouterLink to="/cf-daily">CF统计</RouterLink></li>
-          <li v-if="isAdmin"><RouterLink to="/solutions">题解</RouterLink></li>
-          <li v-if="isAdmin"><RouterLink to="/journal">游记</RouterLink></li>
+          <li><RouterLink to="/solutions">题解</RouterLink></li>
+          <li v-if="canManage"><RouterLink to="/admin/solutions">题解管理</RouterLink></li>
+          <li v-if="canManage"><RouterLink to="/admin/journal">游记管理</RouterLink></li>
           <li><RouterLink to="/friends">友链</RouterLink></li>
         </ul>
         <div class="header-actions">
-          <button v-if="!user" class="btn btn-ghost btn-sm" @click="openAuthModal">
+          <RouterLink v-if="!user" class="btn btn-ghost btn-sm" :to="loginTarget">
             登录
-          </button>
-          <div v-else class="user-menu" ref="userMenuRef">
-            <span class="user-greeting">{{ user.email?.split('@')[0] }}</span>
-            <button class="btn btn-ghost btn-sm" @click="signOut">退出</button>
+          </RouterLink>
+          <div v-else class="user-menu">
+            <span class="user-greeting">{{ userLabel }}</span>
+            <button class="btn btn-ghost btn-sm" @click="handleSignOut">退出</button>
           </div>
         </div>
         <div class="theme-switcher" ref="themeSwitcherRef">
@@ -170,8 +231,6 @@ onErrorCaptured((error) => {
     </section>
   </main>
   <RouterView v-else />
-
-  <AuthModal v-if="authModalOpen" @close="closeAuthModal" @login="closeAuthModal" />
 
   <div class="toast-stack" aria-live="polite" aria-atomic="true">
     <article

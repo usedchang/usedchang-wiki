@@ -1,50 +1,36 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { getAllPosts, POST_KIND } from "../utils/postStorage";
-import { exportSiteData, importSiteDataFromFile } from "../utils/siteBackup";
-import { pushToast } from "../utils/toast";
-
 const avatarUrl = "/images/avatar-usedchang.png";
-const backupInputRef = ref(null);
 
-function triggerImport() {
-  backupInputRef.value?.click();
-}
+const posts = ref([]);
+const postsLoading = ref(true);
+const postsError = ref("");
 
-function onExportBackup() {
+async function loadPosts() {
+  postsLoading.value = true;
+  postsError.value = "";
   try {
-    exportSiteData();
-    pushToast("已下载备份文件", "success");
-  } catch (e) {
-    pushToast(e?.message || "导出失败", "error", 3200);
+    posts.value = await getAllPosts();
+  } catch (error) {
+    postsError.value = error?.message || "读取文章失败";
+    posts.value = [];
+  } finally {
+    postsLoading.value = false;
   }
 }
 
-async function onBackupFileChange(ev) {
-  const file = ev.target?.files?.[0];
-  ev.target.value = "";
-  if (!file) return;
-  if (!confirm("导入将覆盖当前浏览器内所有本地文章与评论，且不可撤销。确定继续？")) return;
-  try {
-    await importSiteDataFromFile(file);
-    pushToast("导入成功，即将刷新页面", "success");
-    window.setTimeout(() => window.location.reload(), 900);
-  } catch (e) {
-    pushToast(e?.message || "导入失败", "error", 4000);
-  }
-}
+onMounted(loadPosts);
 
 const latestPublishedSolutions = computed(() =>
-  getAllPosts()
-    .filter(
-      (post) => post.status === "published" && post.kind !== POST_KIND.journal
-    )
+  posts.value
+    .filter((post) => post.status === "published" && post.kind !== POST_KIND.journal)
     .sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
     .slice(0, 3)
 );
 
 const latestPublishedJournals = computed(() =>
-  getAllPosts()
+  posts.value
     .filter((post) => post.status === "published" && post.kind === POST_KIND.journal)
     .sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
     .slice(0, 3)
@@ -87,6 +73,9 @@ const latestPublishedJournals = computed(() =>
       </div>
     </section>
 
+    <p v-if="postsError" class="container section auth-error">{{ postsError }}</p>
+    <p v-else-if="postsLoading" class="container section comment-status">正在加载文章...</p>
+
     <section class="container section" id="journal">
       <div class="section-title-row">
         <h2>最新游记</h2>
@@ -110,6 +99,7 @@ const latestPublishedJournals = computed(() =>
     <section class="container section" id="solutions">
       <div class="section-title-row">
         <h2>最新题解</h2>
+        <RouterLink class="section-link" to="/solutions">查看全部 →</RouterLink>
       </div>
       <div v-if="latestPublishedSolutions.length" class="card-grid">
         <article v-for="item in latestPublishedSolutions" :key="item.id" class="card">
@@ -124,7 +114,7 @@ const latestPublishedJournals = computed(() =>
           <p>{{ item.summary || "暂无摘要，点击阅读完整题解。" }}</p>
         </article>
       </div>
-      <div v-else class="empty-state">还没有已发布题解，先去写一篇并发布吧。</div>
+      <div v-else class="empty-state">还没有已发布题解，内容正在整理中。</div>
     </section>
 
     <section class="container section" id="study">

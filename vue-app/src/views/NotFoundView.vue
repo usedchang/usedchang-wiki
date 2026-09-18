@@ -8,7 +8,7 @@
       </p>
       <div class="card-actions">
         <RouterLink class="btn btn-primary" to="/">返回首页</RouterLink>
-        <RouterLink class="btn btn-ghost" to="/solutions">去题解管理</RouterLink>
+        <RouterLink class="btn btn-ghost" to="/solutions">浏览题解</RouterLink>
       </div>
     </section>
   </main>

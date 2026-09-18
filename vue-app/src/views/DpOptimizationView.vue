@@ -3,7 +3,11 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import DOMPurify from "dompurify";
 import { DP_SECTIONS } from "../content/dp-optimization";
-import { createMarkdownIt, attachCopyButtons } from "../utils/markdownRenderer";
+import {
+  createMarkdownIt,
+  attachCopyButtons,
+  MARKDOWN_SANITIZE_OPTIONS,
+} from "../utils/markdownRenderer";
 import "katex/dist/katex.min.css";
 
 const route = useRoute();
@@ -18,7 +22,7 @@ const sections = DP_SECTIONS;
 const renderedSections = computed(() =>
   sections.map((section) => ({
     ...section,
-    html: DOMPurify.sanitize(md.render(section.markdown)),
+    html: DOMPurify.sanitize(md.render(section.markdown), MARKDOWN_SANITIZE_OPTIONS),
   }))
 );
 
