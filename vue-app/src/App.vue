@@ -50,13 +50,8 @@ const userLabel = computed(
 );
 
 function toggleNavDropdown() {
-  if (navDropdownOpen.value) {
-    navDropdownOpen.value = false;
-    router.push("/dp-optimization");
-  } else {
-    navDropdownOpen.value = true;
-    manageDropdownOpen.value = false;
-  }
+  navDropdownOpen.value = !navDropdownOpen.value;
+  if (navDropdownOpen.value) manageDropdownOpen.value = false;
 }
 
 function toggleManageDropdown() {
@@ -185,7 +180,6 @@ onErrorCaptured((error) => {
             <ul v-if="navDropdownOpen" class="nav-dropdown-menu">
               <li><RouterLink to="/study-plan" @click="navDropdownOpen = false">学习计划</RouterLink></li>
               <li><RouterLink to="/knowledge" @click="navDropdownOpen = false">知识学习</RouterLink></li>
-              <li><RouterLink to="/dp-optimization" @click="navDropdownOpen = false">DP优化</RouterLink></li>
             </ul>
           </li>
           <li><RouterLink to="/cf-daily">CF统计</RouterLink></li>

@@ -58,7 +58,10 @@ async function loadPost(id) {
   appliedRouteHash = "";
   try {
     const nextPost = await getPostById(id, {
-      includeDrafts: supabaseConfigured || import.meta.env.DEV,
+      // Drafts are only readable in the local, unconfigured writing mode.
+      // A configured Supabase project must keep unpublished posts behind the
+      // admin editor/RLS boundary instead of exposing them through /posts/:id.
+      includeDrafts: !supabaseConfigured && import.meta.env.DEV,
     });
     if (request !== loadRequest) return;
     if (String(nextPost?.content || "").length > POST_LIMITS.content) {

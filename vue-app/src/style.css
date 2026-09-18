@@ -377,6 +377,296 @@ a {
   padding: 84px 0 48px;
 }
 
+.home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(280px, 0.82fr);
+  align-items: center;
+  gap: clamp(28px, 6vw, 76px);
+  padding-top: clamp(58px, 8vw, 94px);
+  padding-bottom: 58px;
+}
+
+.home-hero-copy {
+  min-width: 0;
+}
+
+.home-hero-eyebrow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.home-hero-eyebrow .hero-tag {
+  margin: 0;
+}
+
+.home-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid color-mix(in oklab, var(--primary) 30%, var(--border));
+  border-radius: 999px;
+  color: var(--primary);
+  background: color-mix(in oklab, var(--primary) 8%, transparent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.home-live-badge i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--primary) 13%, transparent);
+}
+
+.hero.home-hero h1 {
+  max-width: 14ch;
+  margin-top: 16px;
+  font-size: clamp(2.25rem, 5.4vw, 4.4rem);
+  line-height: 1.12;
+  letter-spacing: -0.045em;
+}
+
+.home-hero .hero-desc {
+  max-width: 640px;
+  margin-top: 20px;
+  font-size: 1.04rem;
+}
+
+.home-hero .hero-actions {
+  margin-top: 28px;
+}
+
+.home-hero .hero-profile {
+  margin-top: 27px;
+  padding-top: 18px;
+  border-top: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+}
+
+.home-hero-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin-top: 30px;
+  padding-top: 18px;
+  border-top: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+}
+
+.home-stat {
+  display: grid;
+  gap: 3px;
+  min-width: 112px;
+  padding-right: 22px;
+  margin-right: 22px;
+  border-right: 1px solid color-mix(in oklab, var(--border) 72%, transparent);
+}
+
+.home-stat:last-child {
+  padding-right: 0;
+  margin-right: 0;
+  border-right: 0;
+}
+
+.home-stat strong {
+  color: var(--text);
+  font-size: 1.5rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-stat span {
+  color: var(--text-soft);
+  font-size: 0.76rem;
+}
+
+.home-quick-panel {
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  padding: clamp(22px, 4vw, 32px);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in oklab, var(--primary) 15%, transparent), transparent 46%),
+    linear-gradient(155deg, var(--card), var(--card-2));
+  box-shadow: 0 18px 42px color-mix(in oklab, var(--text) 8%, transparent);
+}
+
+.home-quick-panel::before {
+  position: absolute;
+  top: -52px;
+  right: -38px;
+  width: 150px;
+  height: 150px;
+  content: "";
+  border: 1px solid color-mix(in oklab, var(--primary) 26%, transparent);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.home-quick-kicker {
+  margin: 0 0 8px;
+  color: var(--primary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.home-quick-panel h2 {
+  position: relative;
+  margin: 0;
+  font: 600 clamp(1.45rem, 3vw, 1.9rem) / 1.25 var(--font-title);
+}
+
+.home-quick-desc {
+  position: relative;
+  margin: 9px 0 19px;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.home-quick-list {
+  position: relative;
+  display: grid;
+  gap: 8px;
+}
+
+.home-quick-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.home-quick-link:hover {
+  transform: translateX(3px);
+  border-color: color-mix(in oklab, var(--primary) 32%, var(--border));
+  background: color-mix(in oklab, var(--surface-soft) 72%, transparent);
+}
+
+.home-quick-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--primary);
+  background: color-mix(in oklab, var(--primary) 12%, transparent);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.home-quick-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  flex: 1;
+}
+
+.home-quick-copy strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-quick-copy small {
+  overflow: hidden;
+  color: var(--text-soft);
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-quick-arrow {
+  flex: 0 0 auto;
+  color: var(--primary);
+  font-size: 1.05rem;
+}
+
+.home-old-blog-link {
+  display: inline-flex;
+  position: relative;
+  gap: 6px;
+  margin-top: 18px;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+}
+
+.home-old-blog-link:hover {
+  color: var(--primary);
+}
+
+@media (max-width: 900px) {
+  .hero.home-hero {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .hero.home-hero h1 {
+    max-width: 18ch;
+  }
+
+  .home-quick-panel {
+    max-width: 680px;
+  }
+}
+
+@media (max-width: 560px) {
+  .hero.home-hero {
+    padding-top: 42px;
+    padding-bottom: 34px;
+  }
+
+  .hero.home-hero h1 {
+    max-width: none;
+    font-size: clamp(2rem, 11vw, 3rem);
+  }
+
+  .home-hero .hero-desc {
+    font-size: 0.96rem;
+  }
+
+  .home-hero-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .home-stat {
+    min-width: 0;
+    margin: 0;
+    padding: 0 10px;
+  }
+
+  .home-stat:first-child {
+    padding-left: 0;
+  }
+
+  .home-stat:last-child {
+    padding-right: 0;
+  }
+
+  .home-stat strong {
+    font-size: 1.3rem;
+  }
+
+  .home-quick-panel {
+    padding: 20px 16px;
+    border-radius: 18px;
+  }
+}
+
 .hero-tag {
   color: var(--primary);
   letter-spacing: 0.08em;
@@ -1477,6 +1767,15 @@ textarea {
 .markdown-preview table {
   width: 100%;
   border-collapse: collapse;
+}
+
+/* The merged DP article contains a wide comparison table. Keep it readable
+ * on phones without allowing the document itself to overflow horizontally. */
+.dp-document table {
+  display: block;
+  min-width: 680px;
+  overflow-x: auto;
+  white-space: nowrap;
 }
 
 .markdown-preview th,

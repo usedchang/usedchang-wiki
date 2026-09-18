@@ -16,8 +16,11 @@ const routes = [
   {
     path: "/dp-optimization",
     name: "dp-optimization",
-    component: () => import("../views/DpOptimizationView.vue"),
-    meta: { title: "DP 优化" },
+    redirect: (to) => ({
+      name: "knowledge-dp-optimization",
+      query: to.query,
+      hash: to.hash,
+    }),
   },
   {
     path: "/cf-daily",
@@ -36,6 +39,14 @@ const routes = [
     name: "knowledge",
     component: () => import("../views/KnowledgeArchiveView.vue"),
     meta: { title: "知识学习" },
+  },
+  {
+    // Keep a stable, human-readable URL for the built-in Markdown document.
+    // This route must precede `/knowledge/:id` below.
+    path: "/knowledge/dp-optimization",
+    name: "knowledge-dp-optimization",
+    component: () => import("../views/DpOptimizationView.vue"),
+    meta: { title: "动态规划优化方法" },
   },
   {
     path: "/knowledge/:id",

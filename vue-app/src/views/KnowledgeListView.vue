@@ -1,9 +1,15 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { createPost, getAllPosts, removePost, POST_KIND } from "../utils/postStorage";
 import { pushToast } from "../utils/toast";
+import {
+  DP_KNOWLEDGE_ARTICLE,
+  DP_KNOWLEDGE_SOURCE,
+  isDpKnowledgePost,
+} from "../content/dp-optimization";
 
+const route = useRoute();
 const router = useRouter();
 const posts = ref([]);
 const loading = ref(true);
@@ -39,6 +45,27 @@ async function createKnowledge() {
   }
 }
 
+/** Create a normal knowledge post populated with the built-in DP Markdown. */
+async function importDpKnowledge() {
+  const existing = posts.value.find(isDpKnowledgePost);
+  if (existing) {
+    router.push(`/admin/knowledge/${existing.id}`);
+    return;
+  }
+  try {
+    const post = await createPost({ kind: POST_KIND.knowledge });
+    await refreshList();
+    pushToast("已创建 DP 优化知识学习草稿，请检查后保存或发布", "success");
+    router.push({
+      name: "admin-knowledge-editor",
+      params: { id: post.id },
+      query: { source: DP_KNOWLEDGE_SOURCE },
+    });
+  } catch (error) {
+    pushToast(error?.message || "导入 DP 优化专题失败", "error", 3200);
+  }
+}
+
 async function removeKnowledge(id) {
   const target = posts.value.find((item) => item.id === id);
   if (!confirm(`确定删除“${target?.title || "未命名知识学习"}”吗？`)) return;
@@ -51,7 +78,10 @@ async function removeKnowledge(id) {
   }
 }
 
-onMounted(refreshList);
+onMounted(async () => {
+  await refreshList();
+  if (route.query.source === DP_KNOWLEDGE_SOURCE) await importDpKnowledge();
+});
 
 const sortedPosts = computed(() => {
   const list = [...posts.value];
@@ -87,6 +117,7 @@ const filteredPosts = computed(() => {
 
 const draftPosts = computed(() => filteredPosts.value.filter((post) => post.status !== "published"));
 const publishedPosts = computed(() => filteredPosts.value.filter((post) => post.status === "published"));
+const hasImportedDp = computed(() => posts.value.some(isDpKnowledgePost));
 
 function resetFilters() {
   keyword.value = "";
@@ -108,7 +139,12 @@ function formatTime(timestamp) {
         <h2>知识学习管理</h2>
         <p class="editor-tip">像编辑题解和游记一样，直接在前端整理知识笔记。</p>
       </div>
-      <button class="btn btn-primary" type="button" @click="createKnowledge">新建知识学习</button>
+      <div class="card-actions">
+        <button v-if="!hasImportedDp" class="btn btn-ghost" type="button" @click="importDpKnowledge">
+          导入 DP 优化专题
+        </button>
+        <button class="btn btn-primary" type="button" @click="createKnowledge">新建知识学习</button>
+      </div>
     </div>
 
     <section class="panel solution-filter-panel">
@@ -137,6 +173,20 @@ function formatTime(timestamp) {
 
     <p v-if="loadError" class="auth-error">{{ loadError }}</p>
     <p v-else-if="loading" class="comment-status">正在读取知识学习...</p>
+
+    <section v-if="!loading && !hasImportedDp" class="panel section-gap">
+      <div class="section-title-row">
+        <div>
+          <p class="solution-title">{{ DP_KNOWLEDGE_ARTICLE.title }}</p>
+          <p class="solution-meta">内置 Markdown 知识文档 · 尚未导入文章库</p>
+          <p class="editor-tip">{{ DP_KNOWLEDGE_ARTICLE.summary }}</p>
+        </div>
+        <div class="card-actions">
+          <RouterLink class="btn btn-ghost" to="/knowledge/dp-optimization">预览</RouterLink>
+          <button class="btn btn-primary" type="button" @click="importDpKnowledge">导入并编辑</button>
+        </div>
+      </div>
+    </section>
 
     <section class="panel">
       <h3 class="panel-title">草稿（{{ draftPosts.length }}）</h3>
@@ -179,7 +229,7 @@ function formatTime(timestamp) {
     </section>
 
     <div v-if="!sortedPosts.length" class="empty-state">
-      还没有知识学习文章，点击右上角「新建知识学习」开始整理。
+      还没有数据库知识文章，可先导入上方「动态规划优化方法」或新建知识学习。
     </div>
     <div v-else-if="!filteredPosts.length" class="empty-state">
       没有匹配当前筛选条件的文章，换个关键词或标签试试。

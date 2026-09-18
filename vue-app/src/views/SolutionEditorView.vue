@@ -21,6 +21,10 @@ import {
   renderMarkdown,
 } from "../utils/markdownRenderer";
 import { supabase, supabaseConfigured } from "../utils/supabase";
+import {
+  DP_KNOWLEDGE_ARTICLE,
+  DP_KNOWLEDGE_SOURCE,
+} from "../content/dp-optimization";
 import "katex/dist/katex.min.css";
 
 const route = useRoute();
@@ -161,6 +165,7 @@ let editVersion = 0;
 
 async function loadById(id) {
   const request = ++loadRequest;
+  let importedBuiltin = false;
   isHydrating.value = true;
   try {
     const found = await getPostById(id, { includeDrafts: true });
@@ -185,11 +190,18 @@ async function loadById(id) {
     tagsText.value = Array.isArray(found.tags) ? found.tags.join(", ") : "";
     status.value = found.status || "draft";
     publishedAt.value = found.publishedAt || null;
+    if (articleKind.value === POST_KIND.knowledge && route.query.source === DP_KNOWLEDGE_SOURCE) {
+      title.value = DP_KNOWLEDGE_ARTICLE.title;
+      summary.value = DP_KNOWLEDGE_ARTICLE.summary;
+      markdownText.value = DP_KNOWLEDGE_ARTICLE.content;
+      tagsText.value = DP_KNOWLEDGE_ARTICLE.tags.join(", ");
+      importedBuiltin = true;
+    }
     loadedPostId.value = id;
     editVersion = 0;
     initialized.value = true;
-    hasPendingChanges.value = false;
-    saveState.value = "saved";
+    hasPendingChanges.value = importedBuiltin;
+    saveState.value = importedBuiltin ? "pending" : "saved";
   } catch (error) {
     if (request !== loadRequest) return;
     initialized.value = false;
@@ -200,6 +212,16 @@ async function loadById(id) {
     if (request === loadRequest) {
       await nextTick();
       isHydrating.value = false;
+      if (importedBuiltin && initialized.value && loadedPostId.value === id) {
+        editVersion += 1;
+        const saved = await saveNow(false);
+        if (saved) {
+          pushToast("已导入 DP 优化 Markdown，可继续编辑或发布", "success");
+          const query = { ...route.query };
+          delete query.source;
+          await router.replace({ query });
+        }
+      }
     }
   }
 }

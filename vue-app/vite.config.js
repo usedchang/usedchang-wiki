@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
         hostname: siteUrl,
         dynamicRoutes: [
           "/study-plan",
-          "/dp-optimization",
+          "/knowledge/dp-optimization",
           "/cf-daily",
           "/solutions",
           "/knowledge",
