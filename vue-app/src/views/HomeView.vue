@@ -83,15 +83,10 @@ function knowledgePath(post) {
           <p class="hero-tag">USEDCHANG · XCPC BLOG</p>
           <span class="home-live-badge"><i aria-hidden="true"></i>持续更新</span>
         </div>
-        <h1>把每一次刷题，整理成下一次的底气。</h1>
+        <h1>憧憬成为人类的 xcpcer?</h1>
         <p class="hero-desc">
           这里记录算法成长轨迹：刷题、补题、题解与知识整理。把零散的思路沉淀下来，方便自己复盘，也方便与你交流。
         </p>
-        <div class="hero-actions">
-          <RouterLink class="btn btn-primary" to="/knowledge">浏览知识学习</RouterLink>
-          <RouterLink class="btn btn-ghost" to="/solutions">查看题解</RouterLink>
-          <RouterLink class="btn btn-ghost" to="/cf-daily">CF 30 天统计</RouterLink>
-        </div>
         <div class="home-hero-stats" aria-label="站点内容统计">
           <div class="home-stat">
             <strong>{{ publishedPosts.length }}</strong>
@@ -113,6 +108,15 @@ function knowledgePath(post) {
             <p>
               欢迎交流：
               <a href="mailto:24211860219@stu.wzu.edu.cn">24211860219@stu.wzu.edu.cn</a>
+            </p>
+            <p>
+              GitHub：
+              <a
+                class="social-link"
+                href="https://github.com/usedchang"
+                target="_blank"
+                rel="noopener noreferrer"
+              >github.com/usedchang ↗</a>
             </p>
           </div>
         </div>
