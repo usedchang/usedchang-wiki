@@ -102,10 +102,26 @@ const rendered = computed(() => {
 const renderedHtml = computed(() => rendered.value.html);
 const headings = computed(() => rendered.value.headings);
 
-const readKindLabel = computed(() => post.value?.kind === POST_KIND.journal ? "游记" : "题解");
-const defaultTitle = computed(() => post.value?.kind === POST_KIND.journal ? "未命名游记" : "未命名题解");
-const archiveLabel = computed(() => post.value?.kind === POST_KIND.journal ? "返回首页" : "返回题解归档");
-const archiveTarget = computed(() => post.value?.kind === POST_KIND.journal ? "/#journal" : "/solutions");
+const readKindLabel = computed(() => {
+  if (post.value?.kind === POST_KIND.journal) return "游记";
+  if (post.value?.kind === POST_KIND.knowledge) return "知识学习";
+  return "题解";
+});
+const defaultTitle = computed(() => {
+  if (post.value?.kind === POST_KIND.journal) return "未命名游记";
+  if (post.value?.kind === POST_KIND.knowledge) return "未命名知识学习";
+  return "未命名题解";
+});
+const archiveLabel = computed(() => {
+  if (post.value?.kind === POST_KIND.journal) return "返回首页";
+  if (post.value?.kind === POST_KIND.knowledge) return "返回知识学习";
+  return "返回题解归档";
+});
+const archiveTarget = computed(() => {
+  if (post.value?.kind === POST_KIND.journal) return "/#journal";
+  if (post.value?.kind === POST_KIND.knowledge) return "/knowledge";
+  return "/solutions";
+});
 const readTime = computed(() => readingMinutes(post.value?.content));
 const showUpdatedDate = computed(() => {
   if (!post.value?.publishedAt || !post.value?.updatedAt) return false;

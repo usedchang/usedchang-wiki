@@ -2,7 +2,16 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch, nextTick } from "vue";
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from "vue-router";
 import DOMPurify from "dompurify";
-import { getPostById, publishPost, unpublishPost, updatePost, POST_KIND, POST_LIMITS } from "../utils/postStorage";
+import {
+  getPostById,
+  publishPost,
+  unpublishPost,
+  updatePost,
+  getPostKindLabel,
+  isPostKind,
+  POST_KIND,
+  POST_LIMITS,
+} from "../utils/postStorage";
 import { pushToast } from "../utils/toast";
 import { SITE_TITLE } from "../constants";
 import {
@@ -18,10 +27,15 @@ const route = useRoute();
 const router = useRouter();
 
 const articleKind = computed(() =>
-  route.meta.articleKind === POST_KIND.journal ? POST_KIND.journal : POST_KIND.solution
+  isPostKind(route.meta.articleKind) ? route.meta.articleKind : POST_KIND.solution
 );
 const isJournal = computed(() => articleKind.value === POST_KIND.journal);
-const listPath = computed(() => (isJournal.value ? "/admin/journal" : "/admin/solutions"));
+const isKnowledge = computed(() => articleKind.value === POST_KIND.knowledge);
+const listPath = computed(() => {
+  if (isJournal.value) return "/admin/journal";
+  if (isKnowledge.value) return "/admin/knowledge";
+  return "/admin/solutions";
+});
 
 function solutionDefaultMarkdown() {
   return `# 题解标题
@@ -73,8 +87,23 @@ function journalDefaultMarkdown() {
 `;
 }
 
+function knowledgeDefaultMarkdown() {
+  return `# 知识学习标题
+
+## 核心概念
+在这里整理要学习的知识点。
+
+## 详细内容
+补充推导、示例和代码模板。
+`;
+}
+
 const defaultMarkdown = computed(() =>
-  isJournal.value ? journalDefaultMarkdown() : solutionDefaultMarkdown()
+  isJournal.value
+    ? journalDefaultMarkdown()
+    : isKnowledge.value
+      ? knowledgeDefaultMarkdown()
+      : solutionDefaultMarkdown()
 );
 
 const markdownText = ref("");
@@ -108,8 +137,12 @@ const saveStatusText = computed(() => {
   return "待保存";
 });
 
-const editorTitle = computed(() => (isJournal.value ? "游记 Markdown 编辑器" : "题解 Markdown 编辑器"));
-const unnamedTitle = computed(() => (isJournal.value ? "未命名游记" : "未命名题解"));
+const editorTitle = computed(() => `${getPostKindLabel(articleKind.value)} Markdown 编辑器`);
+const unnamedTitle = computed(() => {
+  if (isJournal.value) return "未命名游记";
+  if (isKnowledge.value) return "未命名知识学习";
+  return "未命名题解";
+});
 const wordCount = computed(() => markdownText.value.trim().length);
 const lineCount = computed(() => (markdownText.value ? markdownText.value.split(/\r?\n/).length : 0));
 
@@ -136,9 +169,14 @@ async function loadById(id) {
       router.replace(listPath.value);
       return;
     }
-    const storedKind = found.kind === POST_KIND.journal ? POST_KIND.journal : POST_KIND.solution;
+    const storedKind = isPostKind(found.kind) ? found.kind : POST_KIND.solution;
     if (storedKind !== articleKind.value) {
-      router.replace(storedKind === POST_KIND.journal ? "/admin/journal/" + id : "/admin/solutions/" + id);
+      const target = storedKind === POST_KIND.journal
+        ? "/admin/journal/"
+        : storedKind === POST_KIND.knowledge
+          ? "/admin/knowledge/"
+          : "/admin/solutions/";
+      router.replace(target + id);
       return;
     }
     title.value = found.title || unnamedTitle.value;
@@ -217,7 +255,7 @@ function saveNow(showToast = false) {
         saveState.value = isLatestVersion ? "saved" : "pending";
         hasPendingChanges.value = !isLatestVersion;
         if (showToast && isLatestVersion) {
-          pushToast(isJournal.value ? "游记已保存" : "题解已保存", "success");
+          pushToast(`${getPostKindLabel(articleKind.value)}已保存`, "success");
         }
       }
       return true;
@@ -563,7 +601,7 @@ watch(
   () => {
     if (!initialized.value) return;
     const head = title.value?.trim() || unnamedTitle.value;
-    const tag = isJournal.value ? "游记编辑" : "题解编辑";
+    const tag = `${getPostKindLabel(articleKind.value)}编辑`;
     document.title = `${head} · ${tag} · ${SITE_TITLE}`;
   }
 );
@@ -623,13 +661,17 @@ onBeforeUnmount(() => {
           v-model="title"
           class="editor-title-input"
           maxlength="200"
-          :placeholder="isJournal ? '游记标题' : '输入题解标题'"
+          :placeholder="isJournal ? '游记标题' : (isKnowledge ? '知识学习标题' : '输入题解标题')"
         />
         <input
           v-model="summary"
           class="editor-title-input"
           maxlength="1000"
-          :placeholder="isJournal ? '摘要：一句话介绍这趟旅程（列表展示）' : '文章摘要（用于列表展示）'"
+          :placeholder="
+            isJournal
+              ? '摘要：一句话介绍这趟旅程（列表展示）'
+              : (isKnowledge ? '摘要：一句话概括知识点（列表展示）' : '文章摘要（用于列表展示）')
+          "
         />
         <input
           v-model="tagsText"
@@ -638,7 +680,7 @@ onBeforeUnmount(() => {
           :placeholder="
             isJournal
               ? '标签，用英文逗号分隔，如：自由行, 青岛, 三日'
-              : '标签，用英文逗号分隔，如：图论, 最短路, Dijkstra'
+              : (isKnowledge ? '标签，用英文逗号分隔，如：DP, 数据结构, 数学' : '标签，用英文逗号分隔，如：图论, 最短路, Dijkstra')
           "
         />
         <div class="editor-tools editor-toolbar" aria-label="Markdown 工具栏">
@@ -680,7 +722,7 @@ onBeforeUnmount(() => {
           v-model="markdownText"
           class="editor-textarea"
           :maxlength="POST_LIMITS.content"
-          :placeholder="isJournal ? '在这里写 Markdown 游记…' : '在这里写 Markdown 题解…'"
+          :placeholder="isJournal ? '在这里写 Markdown 游记…' : (isKnowledge ? '在这里写 Markdown 知识学习笔记…' : '在这里写 Markdown 题解…')"
           @keydown="handleEditorKeydown"
           @paste="handleEditorPaste"
         />

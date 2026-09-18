@@ -1405,6 +1405,7 @@ textarea {
 .copy-btn {
   color: var(--text-soft);
   padding: 5px 12px;
+  min-height: 30px;
   font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
@@ -1425,13 +1426,37 @@ textarea {
 }
 
 .copy-btn:active {
-  transform: translateY(0);
+  transform: translateY(1px);
+}
+
+.copy-btn:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--primary) 65%, transparent);
+  outline-offset: 2px;
+}
+
+.copy-btn:disabled {
+  cursor: default;
+}
+
+.copy-btn.copying {
+  color: var(--primary);
+  opacity: 1;
+  border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
+  background: color-mix(in oklab, var(--primary) 10%, var(--input-bg));
 }
 
 .copy-btn.copied {
-  color: var(--primary-contrast);
+  color: var(--primary);
   opacity: 1;
-  pointer-events: none;
+  border-color: color-mix(in oklab, var(--primary) 60%, var(--border));
+  background: color-mix(in oklab, var(--primary) 20%, var(--input-bg));
+}
+
+.copy-btn.copy-failed {
+  color: var(--accent-danger);
+  opacity: 1;
+  border-color: color-mix(in oklab, var(--accent-danger) 55%, var(--border));
+  background: color-mix(in oklab, var(--accent-danger) 10%, var(--input-bg));
 }
 
 .markdown-preview pre:not(.hljs) code {

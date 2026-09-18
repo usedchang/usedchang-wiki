@@ -1,11 +1,26 @@
 import { supabase, supabaseConfigured } from "./supabase";
 
-/** @typedef {"solution" | "journal"} PostKind */
+/** @typedef {"solution" | "journal" | "knowledge"} PostKind */
 
 export const POST_KIND = {
   solution: "solution",
   journal: "journal",
+  knowledge: "knowledge",
 };
+
+const POST_KIND_LABELS = Object.freeze({
+  [POST_KIND.solution]: "题解",
+  [POST_KIND.journal]: "游记",
+  [POST_KIND.knowledge]: "知识学习",
+});
+
+export function isPostKind(kind) {
+  return Object.values(POST_KIND).includes(kind);
+}
+
+export function getPostKindLabel(kind) {
+  return POST_KIND_LABELS[kind] || POST_KIND_LABELS[POST_KIND.solution];
+}
 
 export const POST_LIMITS = Object.freeze({
   title: 200,
@@ -48,6 +63,16 @@ const defaultJournalContent = [
   "记录动线、交通、住宿与第一印象。",
   "",
 ].join("\n");
+const defaultKnowledgeContent = [
+  "# 知识学习标题",
+  "",
+  "## 核心概念",
+  "在这里整理要学习的知识点。",
+  "",
+  "## 详细内容",
+  "补充推导、示例和代码模板。",
+  "",
+].join("\n");
 
 function readLocalPosts() {
   try {
@@ -88,7 +113,7 @@ function normalizePost(post) {
   };
   return {
     ...post,
-    kind: post.kind === POST_KIND.journal ? POST_KIND.journal : POST_KIND.solution,
+    kind: isPostKind(post.kind) ? post.kind : POST_KIND.solution,
     tags,
     createdAt: asTimestamp(post.createdAt ?? post.created_at),
     updatedAt: asTimestamp(post.updatedAt ?? post.updated_at),
@@ -134,7 +159,7 @@ function toRemotePatch(patch = {}) {
       : [];
   }
   if (patch.kind !== undefined) {
-    next.kind = patch.kind === POST_KIND.journal ? POST_KIND.journal : POST_KIND.solution;
+    next.kind = isPostKind(patch.kind) ? patch.kind : POST_KIND.solution;
   }
   if (patch.status !== undefined) next.status = patch.status === "published" ? "published" : "draft";
   if (patch.publishedAt !== undefined) {
@@ -180,13 +205,23 @@ export async function getPostById(id, { includeDrafts = false } = {}) {
 }
 
 export async function createPost({ kind = POST_KIND.solution } = {}) {
-  const normalizedKind = kind === POST_KIND.journal ? POST_KIND.journal : POST_KIND.solution;
+  const normalizedKind = isPostKind(kind) ? kind : POST_KIND.solution;
   const now = Date.now();
+  const defaultTitle = normalizedKind === POST_KIND.journal
+    ? "新建游记"
+    : normalizedKind === POST_KIND.knowledge
+      ? "新建知识学习"
+      : "新建题解";
+  const defaultContentForKind = normalizedKind === POST_KIND.journal
+    ? defaultJournalContent
+    : normalizedKind === POST_KIND.knowledge
+      ? defaultKnowledgeContent
+      : defaultContent;
   const localPost = {
     id: crypto.randomUUID(),
-    title: normalizedKind === POST_KIND.journal ? "新建游记" : "新建题解",
+    title: defaultTitle,
     summary: "",
-    content: normalizedKind === POST_KIND.journal ? defaultJournalContent : defaultContent,
+    content: defaultContentForKind,
     tags: [],
     kind: normalizedKind,
     status: "draft",

@@ -32,6 +32,16 @@ const routes = [
     meta: { title: "题解归档" },
   },
   {
+    path: "/knowledge",
+    name: "knowledge",
+    component: () => import("../views/KnowledgeArchiveView.vue"),
+    meta: { title: "知识学习" },
+  },
+  {
+    path: "/knowledge/:id",
+    redirect: (to) => ({ name: "solution-read", params: { id: to.params.id } }),
+  },
+  {
     path: "/solutions/:id",
     redirect: (to) => ({ name: "admin-solution-editor", params: { id: to.params.id } }),
   },
@@ -70,6 +80,18 @@ const routes = [
     name: "admin-journal-editor",
     component: () => import("../views/SolutionEditorView.vue"),
     meta: { title: "编辑游记", articleKind: "journal", requiresAdmin: true },
+  },
+  {
+    path: "/admin/knowledge",
+    name: "admin-knowledge",
+    component: () => import("../views/KnowledgeListView.vue"),
+    meta: { title: "知识学习管理", requiresAdmin: true },
+  },
+  {
+    path: "/admin/knowledge/:id",
+    name: "admin-knowledge-editor",
+    component: () => import("../views/SolutionEditorView.vue"),
+    meta: { title: "编辑知识学习", articleKind: "knowledge", requiresAdmin: true },
   },
   {
     path: "/posts/:id",

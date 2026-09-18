@@ -40,6 +40,19 @@ const dayRange = computed(() => {
   };
 });
 
+// 难度分布使用滚动的最近 30 个自然日，单日选择仍只影响下方明细。
+const recent30DayRange = computed(() => {
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+  const start = new Date(end);
+  start.setDate(start.getDate() - 29);
+  start.setHours(0, 0, 0, 0);
+  return {
+    startSec: Math.floor(start.getTime() / 1000),
+    endSec: Math.floor(end.getTime() / 1000),
+  };
+});
+
 const dailySubmissions = computed(() =>
   submissions.value.filter(
     (item) =>
@@ -61,6 +74,18 @@ const acceptedDailySubmissions = computed(() =>
   dailySubmissions.value.filter((item) => item.verdict === "OK")
 );
 
+const recent30DaySubmissions = computed(() =>
+  submissions.value.filter(
+    (item) =>
+      item.creationTimeSeconds >= recent30DayRange.value.startSec &&
+      item.creationTimeSeconds <= recent30DayRange.value.endSec
+  )
+);
+
+const acceptedRecent30DaySubmissions = computed(() =>
+  recent30DaySubmissions.value.filter((item) => item.verdict === "OK")
+);
+
 const solvedSet = computed(() => {
   const set = new Map();
   for (const item of acceptedDailySubmissions.value) {
@@ -70,6 +95,18 @@ const solvedSet = computed(() => {
   }
   return set;
 });
+
+const recent30DaySolvedSet = computed(() => {
+  const set = new Map();
+  for (const item of acceptedRecent30DaySubmissions.value) {
+    const problem = item.problem || {};
+    const key = `${problem.contestId || "gym"}-${problem.index || ""}-${problem.name || ""}`;
+    if (!set.has(key)) set.set(key, problem);
+  }
+  return set;
+});
+
+const recent30DaySolvedCount = computed(() => recent30DaySolvedSet.value.size);
 
 const solvedCount = computed(() => solvedSet.value.size);
 
@@ -112,7 +149,7 @@ const metricCards = computed(() => [
 
 const ratingDistribution = computed(() => {
   const result = ratingBuckets.map((item) => ({ ...item, count: 0 }));
-  for (const problem of solvedSet.value.values()) {
+  for (const problem of recent30DaySolvedSet.value.values()) {
     const rating = problem.rating;
     if (typeof rating !== "number") {
       result.find((bucket) => bucket.key === "unknown").count += 1;
@@ -437,9 +474,9 @@ onBeforeUnmount(() => {
         <div class="cf-panel-heading">
           <div>
             <p class="cf-panel-kicker">DIFFICULTY</p>
-            <h2 class="panel-title">题目难度分布</h2>
+            <h2 class="panel-title">题目难度分布 · 最近 30 天</h2>
           </div>
-          <span class="cf-panel-total">{{ solvedCount }} 题</span>
+          <span class="cf-panel-total">{{ recent30DaySolvedCount }} 题</span>
         </div>
         <div class="distribution-list">
           <div v-for="bucket in ratingDistribution" :key="bucket.key" class="dist-row">
@@ -448,7 +485,7 @@ onBeforeUnmount(() => {
             <strong>{{ bucket.count }}</strong>
           </div>
         </div>
-        <p class="cf-panel-footnote">按当天去重后的 AC 题目统计</p>
+        <p class="cf-panel-footnote">按最近 30 天去重后的 AC 题目统计（{{ acceptedRecent30DaySubmissions.length }} 次通过提交）</p>
       </section>
 
       <section class="panel cf-heatmap-panel">
@@ -457,7 +494,7 @@ onBeforeUnmount(() => {
             <p class="cf-panel-kicker">ACTIVITY</p>
             <h2 class="panel-title">最近 30 天</h2>
           </div>
-          <span class="cf-panel-total">{{ submissions.length }} 次提交</span>
+          <span class="cf-panel-total">{{ recent30DaySubmissions.length }} 次提交</span>
         </div>
         <p class="cf-heatmap-hint">选择一天查看提交明细</p>
         <div class="heatmap-grid">

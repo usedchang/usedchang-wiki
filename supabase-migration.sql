@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS public.posts (
   summary      TEXT NOT NULL DEFAULT '',
   content      TEXT NOT NULL DEFAULT '',
   tags         JSONB NOT NULL DEFAULT '[]'::jsonb,
-  kind         TEXT NOT NULL DEFAULT 'solution' CHECK (kind IN ('solution', 'journal')),
+  kind         TEXT NOT NULL DEFAULT 'solution' CHECK (kind IN ('solution', 'journal', 'knowledge')),
   status       TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
   author_id    UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -63,6 +63,31 @@ CREATE TABLE IF NOT EXISTS public.posts (
 );
 CREATE INDEX IF NOT EXISTS idx_posts_status_published ON public.posts(status, published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_kind_updated ON public.posts(kind, updated_at DESC);
+
+-- 文章类型扩展：兼容已经执行过旧版本迁移的数据库。
+-- CREATE TABLE IF NOT EXISTS 不会修改既有 CHECK，因此需要显式替换旧约束。
+DO $$
+DECLARE
+  constraint_name TEXT;
+BEGIN
+  -- 先处理本迁移脚本自己创建的约束，保证脚本可以安全重复执行。
+  ALTER TABLE public.posts DROP CONSTRAINT IF EXISTS posts_kind_allowed;
+  FOR constraint_name IN
+    SELECT con.conname
+    FROM pg_constraint AS con
+    WHERE con.conrelid = 'public.posts'::regclass
+      AND con.contype = 'c'
+      AND pg_get_constraintdef(con.oid) ILIKE '%kind%'
+      AND pg_get_constraintdef(con.oid) ILIKE '%solution%'
+      AND pg_get_constraintdef(con.oid) ILIKE '%journal%'
+  LOOP
+    EXECUTE format('ALTER TABLE public.posts DROP CONSTRAINT %I', constraint_name);
+  END LOOP;
+  ALTER TABLE public.posts
+    ADD CONSTRAINT posts_kind_allowed
+    CHECK (kind IN ('solution', 'journal', 'knowledge')) NOT VALID;
+END;
+$$;
 
 -- 新写入的评论必须引用真实文章，且父评论必须属于同一文章。
 -- NOT VALID 不会因历史孤立数据中断迁移，但会立即约束之后的 INSERT/UPDATE；

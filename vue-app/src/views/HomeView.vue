@@ -24,7 +24,7 @@ onMounted(loadPosts);
 
 const latestPublishedSolutions = computed(() =>
   posts.value
-    .filter((post) => post.status === "published" && post.kind !== POST_KIND.journal)
+    .filter((post) => post.status === "published" && post.kind === POST_KIND.solution)
     .sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
     .slice(0, 3)
 );
@@ -32,6 +32,13 @@ const latestPublishedSolutions = computed(() =>
 const latestPublishedJournals = computed(() =>
   posts.value
     .filter((post) => post.status === "published" && post.kind === POST_KIND.journal)
+    .sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
+    .slice(0, 3)
+);
+
+const latestPublishedKnowledge = computed(() =>
+  posts.value
+    .filter((post) => post.status === "published" && post.kind === POST_KIND.knowledge)
     .sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
     .slice(0, 3)
 );
@@ -120,8 +127,18 @@ const latestPublishedJournals = computed(() =>
     <section class="container section" id="study">
       <div class="section-title-row">
         <h2>知识学习</h2>
+        <RouterLink class="section-link" to="/knowledge">查看全部 →</RouterLink>
       </div>
-      <div class="card-grid">
+      <div v-if="latestPublishedKnowledge.length" class="card-grid">
+        <article v-for="item in latestPublishedKnowledge" :key="item.id" class="card">
+          <p class="card-meta">
+            知识学习 · {{ item.tags?.length ? item.tags.join(" / ") : "未分类" }}
+          </p>
+          <h3><RouterLink :to="`/posts/${item.id}`">{{ item.title || "未命名知识学习" }}</RouterLink></h3>
+          <p>{{ item.summary || "暂无摘要，点击阅读完整笔记。" }}</p>
+        </article>
+      </div>
+      <div v-else class="card-grid">
         <article class="card">
           <p class="card-meta">Wiki · 算法</p>
           <h3>

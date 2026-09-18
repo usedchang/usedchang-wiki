@@ -33,6 +33,8 @@ const router = useRouter();
 const themeSwitcherRef = ref(null);
 const navDropdownOpen = ref(false);
 const navDropdownRef = ref(null);
+const manageDropdownOpen = ref(false);
+const manageDropdownRef = ref(null);
 const mobileNavOpen = ref(false);
 const mobileNavToggleRef = ref(null);
 const headerNavRef = ref(null);
@@ -53,7 +55,13 @@ function toggleNavDropdown() {
     router.push("/dp-optimization");
   } else {
     navDropdownOpen.value = true;
+    manageDropdownOpen.value = false;
   }
+}
+
+function toggleManageDropdown() {
+  manageDropdownOpen.value = !manageDropdownOpen.value;
+  if (manageDropdownOpen.value) navDropdownOpen.value = false;
 }
 
 function handleOutsideClick(event) {
@@ -62,6 +70,9 @@ function handleOutsideClick(event) {
   }
   if (navDropdownOpen.value && navDropdownRef.value && !navDropdownRef.value.contains(event.target)) {
     navDropdownOpen.value = false;
+  }
+  if (manageDropdownOpen.value && manageDropdownRef.value && !manageDropdownRef.value.contains(event.target)) {
+    manageDropdownOpen.value = false;
   }
   if (
     mobileNavOpen.value
@@ -99,6 +110,7 @@ watch(
   () => {
     mobileNavOpen.value = false;
     navDropdownOpen.value = false;
+    manageDropdownOpen.value = false;
     expanded.value = false;
   }
 );
@@ -164,6 +176,7 @@ onErrorCaptured((error) => {
               type="button"
               class="nav-dropdown-trigger"
               :class="{ 'nav-dropdown-open': navDropdownOpen }"
+              :aria-expanded="navDropdownOpen"
               @click="toggleNavDropdown"
             >
               专题
@@ -171,13 +184,29 @@ onErrorCaptured((error) => {
             </button>
             <ul v-if="navDropdownOpen" class="nav-dropdown-menu">
               <li><RouterLink to="/study-plan" @click="navDropdownOpen = false">学习计划</RouterLink></li>
+              <li><RouterLink to="/knowledge" @click="navDropdownOpen = false">知识学习</RouterLink></li>
               <li><RouterLink to="/dp-optimization" @click="navDropdownOpen = false">DP优化</RouterLink></li>
             </ul>
           </li>
           <li><RouterLink to="/cf-daily">CF统计</RouterLink></li>
           <li><RouterLink to="/solutions">题解</RouterLink></li>
-          <li v-if="canManage"><RouterLink to="/admin/solutions">题解管理</RouterLink></li>
-          <li v-if="canManage"><RouterLink to="/admin/journal">游记管理</RouterLink></li>
+          <li v-if="canManage" class="nav-dropdown" ref="manageDropdownRef">
+            <button
+              type="button"
+              class="nav-dropdown-trigger"
+              :class="{ 'nav-dropdown-open': manageDropdownOpen }"
+              :aria-expanded="manageDropdownOpen"
+              @click="toggleManageDropdown"
+            >
+              管理
+              <span class="nav-dropdown-arrow" :class="{ 'nav-dropdown-arrow-up': manageDropdownOpen }">▾</span>
+            </button>
+            <ul v-if="manageDropdownOpen" class="nav-dropdown-menu">
+              <li><RouterLink to="/admin/knowledge" @click="manageDropdownOpen = false">知识学习管理</RouterLink></li>
+              <li><RouterLink to="/admin/solutions" @click="manageDropdownOpen = false">题解管理</RouterLink></li>
+              <li><RouterLink to="/admin/journal" @click="manageDropdownOpen = false">游记管理</RouterLink></li>
+            </ul>
+          </li>
           <li><RouterLink to="/friends">友链</RouterLink></li>
         </ul>
         <div class="header-actions">

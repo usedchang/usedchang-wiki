@@ -16,6 +16,7 @@ export default defineConfig(({ mode }) => {
           "/dp-optimization",
           "/cf-daily",
           "/solutions",
+          "/knowledge",
           "/friends",
         ],
       }),

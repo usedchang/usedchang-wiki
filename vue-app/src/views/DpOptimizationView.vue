@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import DOMPurify from "dompurify";
 import { DP_SECTIONS } from "../content/dp-optimization";
+import { getAllPosts, POST_KIND } from "../utils/postStorage";
 import {
   createMarkdownIt,
   attachCopyButtons,
@@ -16,6 +17,9 @@ const md = createMarkdownIt();
 const activeId = ref("intro");
 const contentRoot = ref(null);
 const tocOpen = ref(false);
+const knowledgePosts = ref([]);
+const knowledgeLoading = ref(true);
+const knowledgeError = ref("");
 
 const sections = DP_SECTIONS;
 
@@ -79,9 +83,25 @@ function handleHashOnLoad() {
   }
 }
 
+async function loadKnowledgePosts() {
+  knowledgeLoading.value = true;
+  knowledgeError.value = "";
+  try {
+    knowledgePosts.value = (await getAllPosts())
+      .filter((post) => post.kind === POST_KIND.knowledge && post.status === "published")
+      .sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
+  } catch (error) {
+    knowledgePosts.value = [];
+    knowledgeError.value = error?.message || "读取知识学习文章失败";
+  } finally {
+    knowledgeLoading.value = false;
+  }
+}
+
 watch(renderedSections, bindCopyButtons, { flush: "post" });
 
 onMounted(() => {
+  void loadKnowledgePosts();
   bindCopyButtons();
   handleHashOnLoad();
   window.addEventListener("scroll", updateActiveFromScroll, { passive: true });
@@ -100,8 +120,30 @@ onUnmounted(() => {
       <p class="dp-hero-desc">
         从状态设计到卷积加速，系统整理六类常见 DP 优化手段。
       </p>
-
+      <div class="hero-actions">
+        <RouterLink class="btn btn-primary" to="/knowledge">浏览全部知识学习</RouterLink>
+      </div>
     </header>
+
+    <section v-if="knowledgeLoading" class="container comment-status">
+      正在读取知识学习文章...
+    </section>
+    <section v-else-if="knowledgeError" class="container auth-error">
+      {{ knowledgeError }}（下方静态专题仍可正常阅读）
+    </section>
+    <section v-else-if="knowledgePosts.length" class="container section dp-related-knowledge">
+      <div class="section-title-row">
+        <h2>最新知识学习</h2>
+        <RouterLink class="section-link" to="/knowledge">查看全部 →</RouterLink>
+      </div>
+      <div class="card-grid">
+        <article v-for="post in knowledgePosts.slice(0, 3)" :key="post.id" class="card">
+          <p class="card-meta">知识学习 · {{ post.tags?.length ? post.tags.join(" / ") : "未分类" }}</p>
+          <h3><RouterLink :to="`/posts/${post.id}`">{{ post.title || "未命名知识学习" }}</RouterLink></h3>
+          <p>{{ post.summary || "点击阅读完整学习笔记。" }}</p>
+        </article>
+      </div>
+    </section>
 
     <div class="container dp-layout">
       <aside class="dp-toc" :class="{ 'dp-toc-open': tocOpen }">

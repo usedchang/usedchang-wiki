@@ -18,34 +18,34 @@ async function refreshList() {
   loadError.value = "";
   try {
     posts.value = (await getAllPosts({ includeDrafts: true })).filter(
-      (post) => post.kind === POST_KIND.solution
+      (post) => post.kind === POST_KIND.knowledge
     );
   } catch (error) {
-    loadError.value = error?.message || "读取题解失败";
+    loadError.value = error?.message || "读取知识学习失败";
     posts.value = [];
   } finally {
     loading.value = false;
   }
 }
 
-async function createSolution() {
+async function createKnowledge() {
   try {
-    const post = await createPost({ kind: POST_KIND.solution });
+    const post = await createPost({ kind: POST_KIND.knowledge });
     await refreshList();
-    pushToast("已新建题解草稿", "success");
-    router.push("/admin/solutions/" + post.id);
+    pushToast("已新建知识学习草稿", "success");
+    router.push(`/admin/knowledge/${post.id}`);
   } catch (error) {
-    pushToast(error?.message || "新建题解失败", "error", 3200);
+    pushToast(error?.message || "新建知识学习失败", "error", 3200);
   }
 }
 
-async function removeSolution(id) {
+async function removeKnowledge(id) {
   const target = posts.value.find((item) => item.id === id);
-  if (!confirm("确定删除“" + (target?.title || "未命名题解") + "”吗？")) return;
+  if (!confirm(`确定删除“${target?.title || "未命名知识学习"}”吗？`)) return;
   try {
     await removePost(id);
     await refreshList();
-    pushToast("已删除：" + (target?.title || "未命名题解"), "info");
+    pushToast(`已删除：${target?.title || "未命名知识学习"}`, "info");
   } catch (error) {
     pushToast(error?.message || "删除失败", "error", 3200);
   }
@@ -63,35 +63,30 @@ const sortedPosts = computed(() => {
 
 const allTags = computed(() => {
   const set = new Set();
-  for (const post of sortedPosts.value) {
-    if (!Array.isArray(post.tags)) continue;
-    for (const tag of post.tags) {
+  sortedPosts.value.forEach((post) => {
+    (Array.isArray(post.tags) ? post.tags : []).forEach((tag) => {
       const text = String(tag || "").trim();
       if (text) set.add(text);
-    }
-  }
+    });
+  });
   return [...set];
 });
 
 const filteredPosts = computed(() => {
   const searchText = keyword.value.trim().toLowerCase();
   return sortedPosts.value.filter((post) => {
-    const titleText = String(post.title || "未命名题解").toLowerCase();
-    const matchesKeyword = !searchText || titleText.includes(searchText);
+    const title = String(post.title || "未命名知识学习").toLowerCase();
     const tags = Array.isArray(post.tags) ? post.tags : [];
-    const matchesTag = selectedTag.value === "all" || tags.includes(selectedTag.value);
-    const matchesStatus =
-      selectedStatus.value === "all" || post.status === selectedStatus.value;
-    return matchesKeyword && matchesTag && matchesStatus;
+    return (
+      (!searchText || title.includes(searchText))
+      && (selectedTag.value === "all" || tags.includes(selectedTag.value))
+      && (selectedStatus.value === "all" || post.status === selectedStatus.value)
+    );
   });
 });
 
-const draftPosts = computed(() =>
-  filteredPosts.value.filter((post) => post.status !== "published")
-);
-const publishedPosts = computed(() =>
-  filteredPosts.value.filter((post) => post.status === "published")
-);
+const draftPosts = computed(() => filteredPosts.value.filter((post) => post.status !== "published"));
+const publishedPosts = computed(() => filteredPosts.value.filter((post) => post.status === "published"));
 
 function resetFilters() {
   keyword.value = "";
@@ -100,26 +95,26 @@ function resetFilters() {
   sortBy.value = "updatedAt-desc";
 }
 
-function formatTime(ts) {
-  if (!ts) return "未知时间";
-  return new Date(ts).toLocaleString("zh-CN", { hour12: false });
+function formatTime(timestamp) {
+  if (!timestamp) return "未知时间";
+  return new Date(timestamp).toLocaleString("zh-CN", { hour12: false });
 }
 </script>
 
 <template>
-  <main class="container section solution-list-page">
+  <main class="container section solution-list-page knowledge-list-page">
     <div class="section-title-row">
-      <h2>题解管理</h2>
-      <button class="btn btn-primary" @click="createSolution">新增题解</button>
+      <div>
+        <h2>知识学习管理</h2>
+        <p class="editor-tip">像编辑题解和游记一样，直接在前端整理知识笔记。</p>
+      </div>
+      <button class="btn btn-primary" type="button" @click="createKnowledge">新建知识学习</button>
     </div>
 
     <section class="panel solution-filter-panel">
       <h3 class="panel-title">快速筛选</h3>
       <div class="solution-filter-grid">
-        <input
-          v-model="keyword"
-          placeholder="按标题搜索，如：最短路 / DP / 线段树"
-        />
+        <input v-model="keyword" placeholder="按标题搜索，如：图论 / DP / 数学" />
         <select v-model="selectedStatus">
           <option value="all">全部状态</option>
           <option value="draft">草稿</option>
@@ -135,27 +130,27 @@ function formatTime(ts) {
         </select>
       </div>
       <div class="card-actions">
-        <button class="btn btn-ghost" @click="resetFilters">清空筛选</button>
+        <button class="btn btn-ghost" type="button" @click="resetFilters">清空筛选</button>
         <span class="solution-filter-result">匹配文章：{{ filteredPosts.length }}</span>
       </div>
     </section>
 
     <p v-if="loadError" class="auth-error">{{ loadError }}</p>
-    <p v-else-if="loading" class="comment-status">正在读取题解...</p>
+    <p v-else-if="loading" class="comment-status">正在读取知识学习...</p>
 
     <section class="panel">
       <h3 class="panel-title">草稿（{{ draftPosts.length }}）</h3>
       <div v-if="draftPosts.length" class="solution-list">
         <article v-for="item in draftPosts" :key="item.id" class="solution-item">
           <div>
-            <p class="solution-title">{{ item.title || "未命名题解" }}</p>
+            <p class="solution-title">{{ item.title || "未命名知识学习" }}</p>
             <p class="solution-meta">更新时间：{{ formatTime(item.updatedAt) }}</p>
-            <p class="solution-url">独立链接：/posts/{{ item.id }}</p>
+            <p class="solution-url">阅读链接：/posts/{{ item.id }}</p>
           </div>
           <div class="card-actions">
-            <RouterLink class="btn btn-ghost" :to="`/posts/${item.id}`">阅读</RouterLink>
-            <RouterLink class="btn btn-ghost" :to="`/admin/solutions/${item.id}`">编辑</RouterLink>
-            <button class="btn btn-danger" @click="removeSolution(item.id)">删除</button>
+            <RouterLink class="btn btn-ghost" :to="`/posts/${item.id}`">预览</RouterLink>
+            <RouterLink class="btn btn-ghost" :to="`/admin/knowledge/${item.id}`">编辑</RouterLink>
+            <button class="btn btn-danger" type="button" @click="removeKnowledge(item.id)">删除</button>
           </div>
         </article>
       </div>
@@ -167,26 +162,25 @@ function formatTime(ts) {
       <div v-if="publishedPosts.length" class="solution-list">
         <article v-for="item in publishedPosts" :key="item.id" class="solution-item">
           <div>
-            <p class="solution-title">{{ item.title || "未命名题解" }}</p>
+            <p class="solution-title">{{ item.title || "未命名知识学习" }}</p>
             <p class="solution-meta">
               发布时间：{{ formatTime(item.publishedAt) }} · 更新时间：{{ formatTime(item.updatedAt) }}
             </p>
-            <p class="solution-url">独立链接：/posts/{{ item.id }}</p>
+            <p class="solution-url">阅读链接：/posts/{{ item.id }}</p>
           </div>
           <div class="card-actions">
             <RouterLink class="btn btn-ghost" :to="`/posts/${item.id}`">阅读</RouterLink>
-            <RouterLink class="btn btn-ghost" :to="`/admin/solutions/${item.id}`">编辑</RouterLink>
-            <button class="btn btn-danger" @click="removeSolution(item.id)">删除</button>
+            <RouterLink class="btn btn-ghost" :to="`/admin/knowledge/${item.id}`">编辑</RouterLink>
+            <button class="btn btn-danger" type="button" @click="removeKnowledge(item.id)">删除</button>
           </div>
         </article>
       </div>
-      <p v-else class="empty-hint">暂无已发布文章。</p>
+      <p v-else class="empty-hint">暂无已发布知识学习。</p>
     </section>
 
     <div v-if="!sortedPosts.length" class="empty-state">
-      还没有题解，点击右上角“新增题解”开始写第一篇。
+      还没有知识学习文章，点击右上角「新建知识学习」开始整理。
     </div>
-
     <div v-else-if="!filteredPosts.length" class="empty-state">
       没有匹配当前筛选条件的文章，换个关键词或标签试试。
     </div>
