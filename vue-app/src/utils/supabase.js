@@ -31,14 +31,35 @@ if (!supabaseConfigured) {
   );
 }
 
-export const supabase = createClient(
-  supabaseUrl || "https://placeholder.supabase.co",
-  supabaseAnonKey || "placeholder-key",
-  {
+/**
+ * 创建 Supabase 客户端。
+ *
+ * @supabase/realtime-js 在**构造 RealtimeClient 时**就会解析 WebSocket 实现，
+ * 而原生 `WebSocket` 是 Node 21+ 才有的全局对象。本模块被 postStorage 等
+ * 在导入链路里引用，因此在 Node 20 上运行 `npm test` 时会在导入阶段直接抛
+ * 「Node.js detected but native WebSocket not found.」，导致相关测试文件整体加载失败。
+ *
+ * 浏览器与 Node 22+ 下 `globalThis.WebSocket` 存在，走默认分支，
+ * 实时订阅行为与改动前完全一致。
+ */
+function createSupabaseClient(url, key) {
+  const options = {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
     },
+  };
+  if (!globalThis.WebSocket) {
+    // 仅在缺少原生 WebSocket 的环境（Node 20 等）生效。
+    // 该环境下测试只覆盖 localStorage 分支，不会真正建立实时连接，
+    // 因此这个占位构造器不会被实例化。
+    options.realtime = { transport: class UnsupportedWebSocket {} };
   }
+  return createClient(url, key, options);
+}
+
+export const supabase = createSupabaseClient(
+  supabaseUrl || "https://placeholder.supabase.co",
+  supabaseAnonKey || "placeholder-key"
 );
