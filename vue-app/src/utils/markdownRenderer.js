@@ -7,7 +7,6 @@ import markdownItSub from "markdown-it-sub";
 import markdownItSup from "markdown-it-sup";
 import markdownItTexmath from "markdown-it-texmath";
 import container from "markdown-it-container";
-import katex from "katex";
 import hljs from "highlight.js/lib/core";
 import bash from "highlight.js/lib/languages/bash";
 import c from "highlight.js/lib/languages/c";
@@ -21,6 +20,23 @@ import rust from "highlight.js/lib/languages/rust";
 import sql from "highlight.js/lib/languages/sql";
 import typescript from "highlight.js/lib/languages/typescript";
 import { pushToast } from "./toast.js";
+import { getMathEngine } from "./markdownMath.js";
+
+/**
+ * 交给 markdown-it-texmath 的稳定引擎对象。
+ *
+ * texmath 在插件注册时就把 engine 存了下来，之后每次渲染直接调用引擎上的方法。
+ * 所以这里传一个**方法绑定在共享状态上**的代理对象，而不是 katex 本身：
+ * katex 异步就绪后无需重新注册插件，公式即可自动恢复真实渲染。
+ */
+const mathEngineProxy = {
+  renderToString(value, options) {
+    const engine = getMathEngine();
+    if (engine?.renderToString) return engine.renderToString(value, options);
+    // katex 尚未就绪：先输出转义后的原样公式，避免整页渲染失败。
+    return escapeHtml(value);
+  },
+};
 
 hljs.registerLanguage("bash", bash);
 hljs.registerLanguage("c", c);
@@ -177,7 +193,7 @@ export function createMarkdownIt() {
     .use(markdownItSub)
     .use(markdownItSup)
     .use(markdownItTexmath, {
-      engine: katex,
+      engine: mathEngineProxy,
       delimiters: "dollars",
       katexOptions: { throwOnError: false },
     })

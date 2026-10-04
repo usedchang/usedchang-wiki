@@ -1,51 +1,44 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { getAllPosts, POST_KIND } from "../utils/postStorage";
+import { POST_KIND } from "../utils/postStorage";
+import { loadPosts, useAllPosts } from "../utils/postStore";
+import { SORT_OPTIONS, sortPosts } from "../utils/postFilter";
 import {
   DP_KNOWLEDGE_ARTICLE,
   isDpKnowledgePost,
 } from "../content/dp-optimization";
 const avatarUrl = "/images/avatar-usedchang.png";
 
-const posts = ref([]);
+// 只读公开列表；缓存由 postStore 统一管理，写操作后这里会自动更新。
+const posts = useAllPosts({ includeDrafts: false });
 const postsLoading = ref(true);
 const postsError = ref("");
 
-async function loadPosts() {
+async function loadPostsSafe() {
   postsLoading.value = true;
   postsError.value = "";
   try {
-    posts.value = await getAllPosts();
+    await loadPosts({ includeDrafts: false });
   } catch (error) {
     postsError.value = error?.message || "读取文章失败";
-    posts.value = [];
   } finally {
     postsLoading.value = false;
   }
 }
 
-onMounted(loadPosts);
+onMounted(loadPostsSafe);
 
-const latestPublishedSolutions = computed(() =>
-  posts.value
-    .filter((post) => post.status === "published" && post.kind === POST_KIND.solution)
-    .sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
-    .slice(0, 3)
-);
+/** 取某一类型最新的若干篇已发布文章。 */
+function latestByKind(kind, limit = 3) {
+  return sortPosts(
+    posts.value.filter((post) => post.status === "published" && post.kind === kind),
+    SORT_OPTIONS.published
+  ).slice(0, limit);
+}
 
-const latestPublishedJournals = computed(() =>
-  posts.value
-    .filter((post) => post.status === "published" && post.kind === POST_KIND.journal)
-    .sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
-    .slice(0, 3)
-);
-
-const latestPublishedKnowledge = computed(() =>
-  posts.value
-    .filter((post) => post.status === "published" && post.kind === POST_KIND.knowledge)
-    .sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
-    .slice(0, 3)
-);
+const latestPublishedSolutions = computed(() => latestByKind(POST_KIND.solution));
+const latestPublishedJournals = computed(() => latestByKind(POST_KIND.journal));
+const latestPublishedKnowledge = computed(() => latestByKind(POST_KIND.knowledge));
 
 const homeKnowledgeCards = computed(() => {
   const latest = latestPublishedKnowledge.value;

@@ -103,7 +103,7 @@ function removeTodo(id) {
   <main class="container section plan-page">
     <header class="plan-hero">
       <div class="plan-hero-text">
-        <h2 class="plan-hero-title">学习计划</h2>
+        <h1 class="plan-hero-title">学习计划</h1>
         <p class="plan-hero-desc">按周记录刷题，完成一项勾一项。</p>
       </div>
       <div

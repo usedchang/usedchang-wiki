@@ -8,14 +8,20 @@ import {
   DP_SECTIONS,
   isDpKnowledgePost,
 } from "../content/dp-optimization";
-import { getAllPosts, getPostById, POST_KIND } from "../utils/postStorage";
+import { POST_KIND } from "../utils/postStorage";
+import { loadPost, loadPosts } from "../utils/postStore";
+import { SORT_OPTIONS, sortPosts } from "../utils/postFilter";
 import {
   attachCopyButtons,
   createMarkdownIt,
   MARKDOWN_SANITIZE_OPTIONS,
   renderMarkdown,
 } from "../utils/markdownRenderer";
+import { createMathEngineLoader, hasMath } from "../utils/markdownMath";
 import "katex/dist/katex.min.css";
+
+// 动态 import 必须留在视图内，katex 才会成为本页专属 chunk 而不污染入口。
+const loadMathEngine = createMathEngineLoader(() => import("katex"));
 
 const route = useRoute();
 const router = useRouter();
@@ -28,6 +34,20 @@ const knowledgePosts = ref([]);
 const knowledgeLoading = ref(true);
 const knowledgeError = ref("");
 const activeArticle = ref(DP_KNOWLEDGE_ARTICLE);
+// 文档里出现公式时置位，避免在 katex 就绪前渲染出原样 LaTeX。
+const mathReady = ref(false);
+
+const activeSource = computed(
+  () => activeArticle.value?.content || DP_KNOWLEDGE_MARKDOWN
+);
+
+/** 只有文档可能含公式时才引入 katex，纯文字笔记不受影响。 */
+async function ensureMathEngine(source) {
+  if (mathReady.value) return;
+  if (!hasMath(source)) return;
+  await loadMathEngine();
+  mathReady.value = true;
+}
 
 /** Keep the old section ids while rendering the new single Markdown source. */
 function addLegacySectionIds(html) {
@@ -52,8 +72,9 @@ function addLegacySectionIds(html) {
 }
 
 const renderedDocumentHtml = computed(() => {
-  const source = activeArticle.value?.content || DP_KNOWLEDGE_MARKDOWN;
-  const { html } = renderMarkdown(md, source);
+  // 读到 mathReady 是为了在 katex 到位后重新计算一次，届时公式才会真正排版。
+  if (!mathReady.value && hasMath(activeSource.value)) return "";
+  const { html } = renderMarkdown(md, activeSource.value);
   return DOMPurify.sanitize(addLegacySectionIds(html), MARKDOWN_SANITIZE_OPTIONS);
 });
 
@@ -110,14 +131,17 @@ async function loadKnowledgePosts() {
   knowledgeLoading.value = true;
   knowledgeError.value = "";
   activeArticle.value = DP_KNOWLEDGE_ARTICLE;
+  // 内置文档是默认可见内容，先把它的公式渲染能力准备好，避免闪一下原样 LaTeX。
+  await ensureMathEngine(DP_KNOWLEDGE_MARKDOWN);
   try {
-    const published = (await getAllPosts())
+    const published = (await loadPosts({ includeDrafts: false }))
       .filter((post) => post.kind === POST_KIND.knowledge && post.status === "published");
     const managedMeta = published.find(isDpKnowledgePost);
     if (managedMeta) {
       try {
-        const managedArticle = await getPostById(managedMeta.id);
+        const managedArticle = await loadPost(managedMeta.id);
         if (managedArticle?.content?.trim()) {
+          await ensureMathEngine(managedArticle.content);
           activeArticle.value = { ...DP_KNOWLEDGE_ARTICLE, ...managedArticle, isBuiltin: false };
         }
       } catch {
@@ -125,8 +149,7 @@ async function loadKnowledgePosts() {
         // be read (for example, while a remote project is being migrated).
       }
     }
-    knowledgePosts.value = published
-      .sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
+    knowledgePosts.value = sortPosts(published, SORT_OPTIONS.published);
   } catch (error) {
     knowledgePosts.value = [];
     knowledgeError.value = error?.message || "读取知识学习文章失败";

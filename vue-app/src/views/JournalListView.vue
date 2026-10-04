@@ -1,116 +1,50 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { createPost, getAllPosts, removePost, POST_KIND } from "../utils/postStorage";
+import { usePostList } from "../composables/usePostList";
+import { createPost, POST_KIND } from "../utils/postStorage";
 import { pushToast } from "../utils/toast";
 
 const router = useRouter();
-const posts = ref([]);
-const loading = ref(true);
-const loadError = ref("");
-const keyword = ref("");
-const selectedTag = ref("all");
-const selectedStatus = ref("all");
-const sortBy = ref("updatedAt-desc");
 
-async function refreshList() {
-  loading.value = true;
-  loadError.value = "";
-  try {
-    posts.value = (await getAllPosts({ includeDrafts: true })).filter(
-      (p) => p.kind === POST_KIND.journal
-    );
-  } catch (error) {
-    loadError.value = error?.message || "读取游记失败";
-    posts.value = [];
-  } finally {
-    loading.value = false;
-  }
-}
+const {
+  template,
+  loading,
+  loadError,
+  keyword,
+  selectedTag,
+  selectedStatus,
+  sortBy,
+  filteredPosts,
+  draftPosts,
+  publishedPosts,
+  allTags,
+  emptyHint,
+  resetFilters,
+  removeById,
+  rememberCreated,
+  formatTime,
+} = usePostList({ kind: POST_KIND.journal });
+
+const READ_PATH = (id) => `/posts/${id}`;
+const EDIT_PATH = (id) => `/admin/journal/${id}`;
 
 async function createJournal() {
   try {
     const post = await createPost({ kind: POST_KIND.journal });
-    await refreshList();
-    pushToast("已新建游记草稿", "success");
-    router.push("/admin/journal/" + post.id);
+    rememberCreated(post);
+    pushToast(template.value.newToast, "success");
+    router.push(EDIT_PATH(post.id));
   } catch (error) {
-    pushToast(error?.message || "新建游记失败", "error", 3200);
+    pushToast(error?.message || template.value.createError, "error", 3200);
   }
-}
-
-async function removeJournal(id) {
-  const target = posts.value.find((item) => item.id === id);
-  if (!confirm("确定删除“" + (target?.title || "未命名游记") + "”吗？")) return;
-  try {
-    await removePost(id);
-    await refreshList();
-    pushToast("已删除：" + (target?.title || "未命名游记"), "info");
-  } catch (error) {
-    pushToast(error?.message || "删除失败", "error", 3200);
-  }
-}
-
-onMounted(refreshList);
-
-const sortedPosts = computed(() => {
-  const list = [...posts.value];
-  if (sortBy.value === "publishedAt-desc") {
-    return list.sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
-  }
-  return list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-});
-
-const allTags = computed(() => {
-  const set = new Set();
-  for (const post of sortedPosts.value) {
-    if (!Array.isArray(post.tags)) continue;
-    for (const tag of post.tags) {
-      const text = String(tag || "").trim();
-      if (text) set.add(text);
-    }
-  }
-  return [...set];
-});
-
-const filteredPosts = computed(() => {
-  const searchText = keyword.value.trim().toLowerCase();
-  return sortedPosts.value.filter((post) => {
-    const titleText = String(post.title || "未命名游记").toLowerCase();
-    const matchesKeyword = !searchText || titleText.includes(searchText);
-    const tags = Array.isArray(post.tags) ? post.tags : [];
-    const matchesTag = selectedTag.value === "all" || tags.includes(selectedTag.value);
-    const matchesStatus =
-      selectedStatus.value === "all" || post.status === selectedStatus.value;
-    return matchesKeyword && matchesTag && matchesStatus;
-  });
-});
-
-const draftPosts = computed(() =>
-  filteredPosts.value.filter((post) => post.status !== "published")
-);
-const publishedPosts = computed(() =>
-  filteredPosts.value.filter((post) => post.status === "published")
-);
-
-function resetFilters() {
-  keyword.value = "";
-  selectedTag.value = "all";
-  selectedStatus.value = "all";
-  sortBy.value = "updatedAt-desc";
-}
-
-function formatTime(ts) {
-  if (!ts) return "未知时间";
-  return new Date(ts).toLocaleString("zh-CN", { hour12: false });
 }
 </script>
 
 <template>
   <main class="container section solution-list-page journal-list-page">
     <div class="section-title-row">
-      <h2>游记 · 文章</h2>
-      <button class="btn btn-primary" @click="createJournal">新建游记</button>
+      <h1>{{ template.adminLabel }}</h1>
+      <button class="btn btn-primary" type="button" @click="createJournal">{{ template.newTitle }}</button>
     </div>
 
     <p class="journal-intro panel">
@@ -136,27 +70,27 @@ function formatTime(ts) {
         </select>
       </div>
       <div class="card-actions">
-        <button class="btn btn-ghost" @click="resetFilters">清空筛选</button>
+        <button class="btn btn-ghost" type="button" @click="resetFilters">清空筛选</button>
         <span class="solution-filter-result">匹配文章：{{ filteredPosts.length }}</span>
       </div>
     </section>
 
-    <p v-if="loadError" class="auth-error">{{ loadError }}</p>
-    <p v-else-if="loading" class="comment-status">正在读取游记...</p>
+    <p v-if="loadError" class="auth-error" role="alert">{{ loadError }}</p>
+    <p v-else-if="loading" class="comment-status">正在读取游记…</p>
 
     <section class="panel">
       <h3 class="panel-title">草稿（{{ draftPosts.length }}）</h3>
       <div v-if="draftPosts.length" class="solution-list">
         <article v-for="item in draftPosts" :key="item.id" class="solution-item">
           <div>
-            <p class="solution-title">{{ item.title || "未命名游记" }}</p>
+            <p class="solution-title">{{ item.title || template.untitled }}</p>
             <p class="solution-meta">更新时间：{{ formatTime(item.updatedAt) }}</p>
-            <p class="solution-url">阅读链接：/posts/{{ item.id }}</p>
+            <p class="solution-url">阅读链接：{{ READ_PATH(item.id) }}</p>
           </div>
           <div class="card-actions">
-            <RouterLink class="btn btn-ghost" :to="`/posts/${item.id}`">阅读</RouterLink>
-            <RouterLink class="btn btn-ghost" :to="`/admin/journal/${item.id}`">编辑</RouterLink>
-            <button class="btn btn-danger" @click="removeJournal(item.id)">删除</button>
+            <RouterLink class="btn btn-ghost" :to="READ_PATH(item.id)">阅读</RouterLink>
+            <RouterLink class="btn btn-ghost" :to="EDIT_PATH(item.id)">编辑</RouterLink>
+            <button class="btn btn-danger" type="button" @click="removeById(item.id)">删除</button>
           </div>
         </article>
       </div>
@@ -168,28 +102,22 @@ function formatTime(ts) {
       <div v-if="publishedPosts.length" class="solution-list">
         <article v-for="item in publishedPosts" :key="item.id" class="solution-item">
           <div>
-            <p class="solution-title">{{ item.title || "未命名游记" }}</p>
+            <p class="solution-title">{{ item.title || template.untitled }}</p>
             <p class="solution-meta">
               发布时间：{{ formatTime(item.publishedAt) }} · 更新时间：{{ formatTime(item.updatedAt) }}
             </p>
-            <p class="solution-url">阅读链接：/posts/{{ item.id }}</p>
+            <p class="solution-url">阅读链接：{{ READ_PATH(item.id) }}</p>
           </div>
           <div class="card-actions">
-            <RouterLink class="btn btn-ghost" :to="`/posts/${item.id}`">阅读</RouterLink>
-            <RouterLink class="btn btn-ghost" :to="`/admin/journal/${item.id}`">编辑</RouterLink>
-            <button class="btn btn-danger" @click="removeJournal(item.id)">删除</button>
+            <RouterLink class="btn btn-ghost" :to="READ_PATH(item.id)">阅读</RouterLink>
+            <RouterLink class="btn btn-ghost" :to="EDIT_PATH(item.id)">编辑</RouterLink>
+            <button class="btn btn-danger" type="button" @click="removeById(item.id)">删除</button>
           </div>
         </article>
       </div>
-      <p v-else class="empty-hint">暂无已发布游记。</p>
+      <p v-else class="empty-hint">{{ template.emptyPublished }}</p>
     </section>
 
-    <div v-if="!sortedPosts.length" class="empty-state">
-      还没有游记，点击右上角「新建游记」开始写第一篇。
-    </div>
-
-    <div v-else-if="!filteredPosts.length" class="empty-state">
-      没有匹配当前筛选条件的文章，换个关键词或标签试试。
-    </div>
+    <div v-if="emptyHint" class="empty-state">{{ emptyHint }}</div>
   </main>
 </template>

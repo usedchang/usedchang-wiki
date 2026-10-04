@@ -1,68 +1,19 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
-import { getAllPosts, POST_KIND } from "../utils/postStorage";
+import { POST_KIND } from "../utils/postStorage";
+import ArchiveCard from "../components/ArchiveCard.vue";
+import { usePostArchive } from "../composables/usePostArchive";
+import { ALL } from "../utils/postFilter";
 
-const posts = ref([]);
-const loading = ref(true);
-const loadError = ref("");
-const keyword = ref("");
-const selectedTag = ref("all");
-
-async function loadSolutions() {
-  loading.value = true;
-  loadError.value = "";
-  try {
-    posts.value = (await getAllPosts())
-      .filter((post) => post.kind === POST_KIND.solution && post.status === "published")
-      .sort((a, b) => (b.publishedAt || b.updatedAt || 0) - (a.publishedAt || a.updatedAt || 0));
-  } catch (error) {
-    loadError.value = error?.message || "读取题解失败";
-    posts.value = [];
-  } finally {
-    loading.value = false;
-  }
-}
-
-onMounted(loadSolutions);
-
-const allTags = computed(() => {
-  const tags = new Set();
-  for (const post of posts.value) {
-    for (const tag of post.tags || []) {
-      const text = String(tag || "").trim();
-      if (text) tags.add(text);
-    }
-  }
-  return [...tags].sort((a, b) => a.localeCompare(b, "zh-CN"));
-});
-
-const filteredPosts = computed(() => {
-  const search = keyword.value.trim().toLocaleLowerCase("zh-CN");
-  return posts.value.filter((post) => {
-    const tags = Array.isArray(post.tags) ? post.tags : [];
-    const searchable = [post.title, post.summary, ...tags]
-      .map((item) => String(item || "").toLocaleLowerCase("zh-CN"))
-      .join("\n");
-    return (!search || searchable.includes(search))
-      && (selectedTag.value === "all" || tags.includes(selectedTag.value));
-  });
-});
-
-function formatDate(value) {
-  if (!value) return "日期未知";
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(value));
-}
-
-function dateTimeValue(value) {
-  if (!value) return undefined;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
-}
-
+const {
+  posts,
+  loading,
+  loadError,
+  keyword,
+  selectedTag,
+  allTags,
+  filteredPosts,
+  load,
+} = usePostArchive({ kind: POST_KIND.solution, loadErrorText: "读取题解失败" });
 </script>
 
 <template>
@@ -94,43 +45,24 @@ function dateTimeValue(value) {
 
     <section v-if="loadError" class="empty-state archive-state" role="alert">
       <p>{{ loadError }}</p>
-      <button class="btn btn-primary" type="button" @click="loadSolutions">重新加载</button>
+      <button class="btn btn-primary" type="button" @click="load">重新加载</button>
     </section>
     <section v-else-if="loading" class="archive-grid" aria-label="正在加载题解">
       <article v-for="item in 3" :key="item" class="solution-archive-card archive-card-skeleton"></article>
     </section>
     <section v-else-if="filteredPosts.length" class="archive-grid">
-      <article v-for="item in filteredPosts" :key="item.id" class="solution-archive-card">
-        <div class="archive-card-topline">
-          <time :datetime="dateTimeValue(item.publishedAt || item.updatedAt)">
-            {{ formatDate(item.publishedAt || item.updatedAt) }}
-          </time>
-          <span>{{ item.tags?.length ? `${item.tags.length} 个标签` : "XCPC 题解" }}</span>
-        </div>
-        <h2>
-          <RouterLink :to="`/posts/${item.id}`">{{ item.title || "未命名题解" }}</RouterLink>
-        </h2>
-        <p class="archive-card-summary">{{ item.summary || "这篇题解暂未填写摘要，点击查看完整思路与代码。" }}</p>
-        <div class="archive-card-footer">
-          <div class="tag-list archive-card-tags">
-            <button
-              v-for="tag in (item.tags || []).slice(0, 4)"
-              :key="tag"
-              type="button"
-              @click="selectedTag = tag"
-            >
-              {{ tag }}
-            </button>
-          </div>
-          <RouterLink class="archive-read-link" :to="`/posts/${item.id}`">
-            阅读题解 <span aria-hidden="true">→</span>
-          </RouterLink>
-        </div>
-      </article>
+      <ArchiveCard
+        v-for="item in filteredPosts"
+        :key="item.id"
+        :post="item"
+        :read-path="`/posts/${item.id}`"
+        read-label="阅读题解"
+        @select-tag="selectedTag = $event"
+      />
     </section>
     <section v-else class="empty-state archive-state">
       <p>{{ posts.length ? "没有匹配当前条件的题解。" : "题解正在整理中，稍后再来看看。" }}</p>
-      <button v-if="posts.length" class="btn btn-ghost" type="button" @click="keyword = ''; selectedTag = 'all'">
+      <button v-if="posts.length" class="btn btn-ghost" type="button" @click="keyword = ''; selectedTag = ALL">
         清空筛选
       </button>
     </section>

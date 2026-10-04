@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, onMounted, ref, watch, nextTick } from "vue"
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from "vue-router";
 import DOMPurify from "dompurify";
 import {
-  getPostById,
   publishPost,
   unpublishPost,
   updatePost,
@@ -12,6 +11,7 @@ import {
   POST_KIND,
   POST_LIMITS,
 } from "../utils/postStorage";
+import { applyPostChange, loadPost } from "../utils/postStore";
 import { pushToast } from "../utils/toast";
 import { SITE_TITLE } from "../constants";
 import {
@@ -21,11 +21,15 @@ import {
   renderMarkdown,
 } from "../utils/markdownRenderer";
 import { supabase, supabaseConfigured } from "../utils/supabase";
+import { createMathEngineLoader, hasMath } from "../utils/markdownMath";
 import {
   DP_KNOWLEDGE_ARTICLE,
   DP_KNOWLEDGE_SOURCE,
 } from "../content/dp-optimization";
 import "katex/dist/katex.min.css";
+
+// 动态 import 留在视图内，katex 才只属于编辑器 chunk。
+const loadMathEngine = createMathEngineLoader(() => import("katex"));
 
 const route = useRoute();
 const router = useRouter();
@@ -168,7 +172,7 @@ async function loadById(id) {
   let importedBuiltin = false;
   isHydrating.value = true;
   try {
-    const found = await getPostById(id, { includeDrafts: true });
+    const found = await loadPost(id, { includeDrafts: true });
     if (request !== loadRequest) return;
     if (!found) {
       router.replace(listPath.value);
@@ -257,6 +261,8 @@ async function saveCurrent(snapshot) {
   }
   const result = await updatePost(snapshot.id, snapshot.patch);
   if (!result) throw new Error("文章不存在，无法保存");
+  // 把写回结果同步进缓存，退出编辑器回到列表页时无需重新回源。
+  applyPostChange(result);
   return result;
 }
 
@@ -313,6 +319,7 @@ async function onPublish() {
     const post = await publishPost(id);
     status.value = post.status;
     publishedAt.value = post.publishedAt;
+    applyPostChange(post);
     pushToast("发布成功，可通过公开链接访问", "success");
   } catch (error) {
     pushToast(error?.message || "发布失败", "error", 3200);
@@ -326,6 +333,7 @@ async function onUnpublish() {
     const post = await unpublishPost(id);
     status.value = post.status;
     publishedAt.value = post.publishedAt;
+    applyPostChange(post);
     pushToast("已取消发布", "info");
   } catch (error) {
     pushToast(error?.message || "操作失败", "error", 3200);
@@ -600,6 +608,15 @@ function handleBeforeUnload(event) {
   event.preventDefault();
   event.returnValue = "";
 }
+
+// 预览里出现公式时才拉起 katex；纯文字随笔不会为此付出代价。
+watch(
+  markdownText,
+  (value) => {
+    if (hasMath(value)) void loadMathEngine();
+  },
+  { immediate: true }
+);
 
 const renderedHtml = computed(() =>
   markdownText.value.length > POST_LIMITS.content

@@ -1,4 +1,4 @@
-import { supabase, supabaseConfigured } from "./supabase";
+import { supabase, isRemoteEnabled } from "./supabase.js";
 
 /** @typedef {"solution" | "journal" | "knowledge"} PostKind */
 
@@ -8,41 +8,10 @@ export const POST_KIND = {
   knowledge: "knowledge",
 };
 
-const POST_KIND_LABELS = Object.freeze({
-  [POST_KIND.solution]: "题解",
-  [POST_KIND.journal]: "游记",
-  [POST_KIND.knowledge]: "知识学习",
-});
-
 export function isPostKind(kind) {
   return Object.values(POST_KIND).includes(kind);
 }
 
-export function getPostKindLabel(kind) {
-  return POST_KIND_LABELS[kind] || POST_KIND_LABELS[POST_KIND.solution];
-}
-
-export const POST_LIMITS = Object.freeze({
-  title: 200,
-  summary: 1000,
-  content: 1_000_000,
-  tags: 30,
-  tag: 40,
-});
-
-const STORAGE_KEY = "usedchang-posts";
-const REMOTE_POST_COLUMNS = [
-  "id",
-  "title",
-  "summary",
-  "content",
-  "tags",
-  "kind",
-  "status",
-  "created_at",
-  "updated_at",
-  "published_at",
-].join(",");
 const defaultContent = [
   "# 新建题解",
   "",
@@ -73,6 +42,89 @@ const defaultKnowledgeContent = [
   "补充推导、示例和代码模板。",
   "",
 ].join("\n");
+
+/**
+ * 每种文章类型的文案模板。原先这段文案分散在三个管理视图里各写一遍，
+ * 增删类型时容易漏改，这里收敛成单一来源。
+ */
+const POST_KIND_TEMPLATES = Object.freeze({
+  [POST_KIND.solution]: {
+    label: "题解",
+    adminLabel: "题解",
+    untitled: "未命名题解",
+    newTitle: "新建题解",
+    newToast: "已新建题解草稿",
+    createError: "新建题解失败",
+    loadError: "读取题解失败",
+    emptyAll: "还没有题解，点击右上角「新增题解」开始写第一篇。",
+    emptyFiltered: "没有匹配当前筛选条件的文章，换个关键词或标签试试。",
+    emptyPublished: "暂无已发布文章。",
+    cardFallback: "XCPC 题解",
+    defaultSummary: "这篇题解暂未填写摘要，点击查看完整思路与代码。",
+    draftContent: defaultContent,
+  },
+  [POST_KIND.journal]: {
+    label: "游记",
+    adminLabel: "游记 · 文章",
+    untitled: "未命名游记",
+    newTitle: "新建游记",
+    newToast: "已新建游记草稿",
+    createError: "新建游记失败",
+    loadError: "读取游记失败",
+    emptyAll: "还没有游记，点击右上角「新建游记」开始写第一篇。",
+    emptyFiltered: "没有匹配当前筛选条件的文章，换个关键词或标签试试。",
+    emptyPublished: "暂无已发布游记。",
+    cardFallback: "游记",
+    defaultSummary: "这篇游记暂未填写摘要，点击查看完整内容。",
+    draftContent: defaultJournalContent,
+  },
+  [POST_KIND.knowledge]: {
+    label: "知识学习",
+    adminLabel: "知识学习管理",
+    untitled: "未命名知识学习",
+    newTitle: "新建知识学习",
+    newToast: "已新建知识学习草稿",
+    createError: "新建知识学习失败",
+    loadError: "读取知识学习失败",
+    emptyAll: "还没有知识文章，先新建一篇知识学习。",
+    emptyFiltered: "没有匹配当前筛选条件的文章，换个关键词或标签试试。",
+    emptyPublished: "暂无已发布知识学习。",
+    cardFallback: "知识学习",
+    defaultSummary: "点击查看完整学习笔记。",
+    draftContent: defaultKnowledgeContent,
+  },
+});
+
+/** 返回该类型的文案模板；未知类型回退到题解。 */
+export function getPostKindTemplate(kind) {
+  return POST_KIND_TEMPLATES[kind] || POST_KIND_TEMPLATES[POST_KIND.solution];
+}
+
+export function getPostKindLabel(kind) {
+  return getPostKindTemplate(kind).label;
+}
+
+export const POST_LIMITS = Object.freeze({
+  title: 200,
+  summary: 1000,
+  content: 1_000_000,
+  tags: 30,
+  tag: 40,
+});
+
+const STORAGE_KEY = "usedchang-posts";
+const REMOTE_POST_COLUMNS = [
+  "id",
+  "title",
+  "summary",
+  "content",
+  "tags",
+  "kind",
+  "status",
+  "created_at",
+  "updated_at",
+  "published_at",
+].join(",");
 
 function readLocalPosts() {
   try {
@@ -183,7 +235,7 @@ function localGetPostById(id, includeDrafts = true) {
 
 /** 获取文章。默认只返回已发布文章；管理页传 includeDrafts:true。 */
 export async function getAllPosts({ includeDrafts = false, includeContent = false } = {}) {
-  if (!supabaseConfigured) return localGetAllPosts(includeDrafts, includeContent);
+  if (!isRemoteEnabled()) return localGetAllPosts(includeDrafts, includeContent);
   const columns = includeContent
     ? REMOTE_POST_COLUMNS
     : "id,title,summary,tags,kind,status,created_at,updated_at,published_at";
@@ -196,7 +248,7 @@ export async function getAllPosts({ includeDrafts = false, includeContent = fals
 
 export async function getPostById(id, { includeDrafts = false } = {}) {
   if (!id) return null;
-  if (!supabaseConfigured) return localGetPostById(id, includeDrafts);
+  if (!isRemoteEnabled()) return localGetPostById(id, includeDrafts);
   let query = supabase.from("posts").select(REMOTE_POST_COLUMNS).eq("id", id);
   if (!includeDrafts) query = query.eq("status", "published");
   const { data, error } = await query.maybeSingle();
@@ -206,22 +258,13 @@ export async function getPostById(id, { includeDrafts = false } = {}) {
 
 export async function createPost({ kind = POST_KIND.solution } = {}) {
   const normalizedKind = isPostKind(kind) ? kind : POST_KIND.solution;
+  const template = getPostKindTemplate(normalizedKind);
   const now = Date.now();
-  const defaultTitle = normalizedKind === POST_KIND.journal
-    ? "新建游记"
-    : normalizedKind === POST_KIND.knowledge
-      ? "新建知识学习"
-      : "新建题解";
-  const defaultContentForKind = normalizedKind === POST_KIND.journal
-    ? defaultJournalContent
-    : normalizedKind === POST_KIND.knowledge
-      ? defaultKnowledgeContent
-      : defaultContent;
   const localPost = {
     id: crypto.randomUUID(),
-    title: defaultTitle,
+    title: template.newTitle,
     summary: "",
-    content: defaultContentForKind,
+    content: template.draftContent,
     tags: [],
     kind: normalizedKind,
     status: "draft",
@@ -229,7 +272,7 @@ export async function createPost({ kind = POST_KIND.solution } = {}) {
     updatedAt: now,
     publishedAt: null,
   };
-  if (!supabaseConfigured) {
+  if (!isRemoteEnabled()) {
     writeLocalPosts([localPost, ...readLocalPosts()]);
     return normalizePost(localPost);
   }
@@ -253,7 +296,7 @@ export async function createPost({ kind = POST_KIND.solution } = {}) {
 }
 
 export async function updatePost(id, patch) {
-  if (!supabaseConfigured) {
+  if (!isRemoteEnabled()) {
     const posts = readLocalPosts();
     let updated = null;
     const next = posts.map((post) => {
@@ -275,7 +318,7 @@ export async function updatePost(id, patch) {
 }
 
 export async function removePost(id) {
-  if (!supabaseConfigured) {
+  if (!isRemoteEnabled()) {
     writeLocalPosts(readLocalPosts().filter((post) => post.id !== id));
     return;
   }
@@ -293,7 +336,7 @@ export async function unpublishPost(id) {
 
 /** 将旧 localStorage 文章上传到 Supabase，重复执行不会覆盖远端文章。 */
 export async function migrateLocalPostsToSupabase() {
-  if (!supabaseConfigured) throw new Error("请先配置 Supabase 环境变量");
+  if (!isRemoteEnabled()) throw new Error("请先配置 Supabase 环境变量");
   const localPosts = readLocalPosts().map(normalizePost);
   let migrated = 0;
   let skipped = 0;

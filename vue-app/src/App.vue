@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onErrorCaptured, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onErrorCaptured, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { pushToast, removeToast, toastList } from "./utils/toast";
 import { applyHljsStylesheet } from "./utils/hljsTheme";
@@ -88,6 +88,7 @@ onMounted(() => {
   applyTheme(theme.value);
   applyHljsStylesheet(theme.value);
   document.addEventListener("click", handleOutsideClick);
+  ensureMainLandmark();
 });
 
 onUnmounted(() => {
@@ -107,8 +108,26 @@ watch(
     navDropdownOpen.value = false;
     manageDropdownOpen.value = false;
     expanded.value = false;
+    ensureMainLandmark();
   }
 );
+
+// 各视图自带 <main>，这里补上跳转链接所需的 id，供键盘用户跳过导航。
+function ensureMainLandmark() {
+  nextTick(() => {
+    const main = document.querySelector("main");
+    if (main && !main.id) {
+      main.id = "main-content";
+      main.setAttribute("tabindex", "-1");
+    }
+  });
+}
+
+function focusMain(event) {
+  event.preventDefault();
+  const main = document.getElementById("main-content") || document.querySelector("main");
+  main?.focus();
+}
 
 function toggleThemeMenu() {
   expanded.value = !expanded.value;
@@ -143,6 +162,7 @@ onErrorCaptured((error) => {
 
 <template>
   <header class="site-header">
+    <a class="skip-link" href="#main-content" @click="focusMain">跳到主要内容</a>
     <div class="container header-inner">
       <RouterLink class="brand" to="/">usedchang</RouterLink>
       <button

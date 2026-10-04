@@ -1,71 +1,44 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
-import { getAllPosts, POST_KIND } from "../utils/postStorage";
+import { POST_KIND } from "../utils/postStorage";
+import ArchiveCard from "../components/ArchiveCard.vue";
+import { usePostArchive } from "../composables/usePostArchive";
+import { SORT_OPTIONS } from "../utils/postFilter";
 import {
   DP_KNOWLEDGE_ARTICLE,
   DP_KNOWLEDGE_SOURCE,
   isDpKnowledgePost,
 } from "../content/dp-optimization";
 
-const posts = ref([]);
-const loading = ref(true);
-const loadError = ref("");
-const keyword = ref("");
-const selectedTag = ref("all");
-
-function addBuiltinFallback(publishedPosts) {
-  const list = Array.isArray(publishedPosts) ? publishedPosts : [];
-  return list.some(isDpKnowledgePost) ? list : [DP_KNOWLEDGE_ARTICLE, ...list];
+/**
+ * 内置 Markdown 文档没有入库，若文章库里没有对应文章就补在最前面。
+ * 它没有 publishedAt，所以用一个极大的 updatedAt 让它稳定排在首位。
+ */
+function pinBuiltinFirst(list) {
+  if (list.some(isDpKnowledgePost)) return list;
+  return [{ ...DP_KNOWLEDGE_ARTICLE, updatedAt: Number.MAX_SAFE_INTEGER }, ...list];
 }
 
-async function loadKnowledge() {
-  loading.value = true;
-  loadError.value = "";
-  try {
-    const published = (await getAllPosts())
-      .filter((post) => post.kind === POST_KIND.knowledge && post.status === "published");
-    posts.value = addBuiltinFallback(published).sort((a, b) => {
-      if (Boolean(a.isBuiltin) !== Boolean(b.isBuiltin)) return a.isBuiltin ? -1 : 1;
-      return (b.publishedAt || 0) - (a.publishedAt || 0);
-    });
-  } catch (error) {
-    // A configured Supabase project may not have the posts table yet.  The
-    // built-in document should remain discoverable while the administrator
-    // fixes the connection or imports it into the article store.
-    posts.value = [DP_KNOWLEDGE_ARTICLE];
-    loadError.value = error?.message || "读取知识学习失败";
-  } finally {
-    loading.value = false;
-  }
-}
-
-onMounted(loadKnowledge);
-
-const allTags = computed(() => {
-  const tags = new Set();
-  posts.value.forEach((post) => (post.tags || []).forEach((tag) => tags.add(String(tag))));
-  return [...tags].filter(Boolean);
+const {
+  posts,
+  loading,
+  loadError,
+  keyword,
+  selectedTag,
+  allTags,
+  filteredPosts,
+  load,
+  resetFilters,
+} = usePostArchive({
+  kind: POST_KIND.knowledge,
+  loadErrorText: "读取知识学习失败",
+  // updatedAt 排序：其余文章回落到自己的发布时间，内置文档恒在最前。
+  sortMode: SORT_OPTIONS.updated,
+  transform: pinBuiltinFirst,
+  onError: (_error, { setPosts }) => {
+    // 远端 posts 表尚未建好时，内置文档仍应可发现；管理员修好连接或导入后即可正常展示。
+    setPosts([{ ...DP_KNOWLEDGE_ARTICLE, updatedAt: Number.MAX_SAFE_INTEGER }]);
+  },
 });
-
-const filteredPosts = computed(() => {
-  const query = keyword.value.trim().toLowerCase();
-  return posts.value.filter((post) => {
-    const title = String(post.title || "未命名知识学习").toLowerCase();
-    const summary = String(post.summary || "").toLowerCase();
-    const tags = Array.isArray(post.tags) ? post.tags : [];
-    return (
-      (!query || title.includes(query) || summary.includes(query))
-      && (selectedTag.value === "all" || tags.includes(selectedTag.value))
-    );
-  });
-});
-
-function formatDate(post) {
-  if (post?.isBuiltin) return "内置专题";
-  const timestamp = post?.publishedAt || post?.updatedAt;
-  if (!timestamp) return "日期未知";
-  return new Date(timestamp).toLocaleDateString("zh-CN");
-}
 
 function readPath(post) {
   return isDpKnowledgePost(post) ? "/knowledge/dp-optimization" : `/posts/${post.id}`;
@@ -85,7 +58,7 @@ function readPath(post) {
     </header>
 
     <p v-if="loadError" class="auth-error archive-load-warning" role="alert">
-      {{ loadError }}；当前显示内置 DP 优化文档。<button class="btn btn-ghost btn-sm" type="button" @click="loadKnowledge">重新加载</button>
+      {{ loadError }}；当前显示内置 DP 优化文档。<button class="btn btn-ghost btn-sm" type="button" @click="load">重新加载</button>
     </p>
 
     <section class="archive-toolbar" aria-label="筛选知识学习">
@@ -107,49 +80,37 @@ function readPath(post) {
       <article v-for="item in 3" :key="item" class="solution-archive-card archive-card-skeleton"></article>
     </section>
     <section v-else-if="filteredPosts.length" class="archive-grid">
-      <article v-for="post in filteredPosts" :key="post.id" class="solution-archive-card">
-        <div class="archive-card-topline">
-          <time>{{ formatDate(post) }}</time>
-          <span>{{ post.isBuiltin ? "内置专题" : (post.tags?.length ? `${post.tags.length} 个标签` : "知识学习") }}</span>
-        </div>
-        <h2><RouterLink :to="readPath(post)">{{ post.title || "未命名知识学习" }}</RouterLink></h2>
-        <p class="archive-card-summary">{{ post.summary || "点击查看完整学习笔记。" }}</p>
-        <div class="archive-card-footer">
-          <div class="tag-list archive-card-tags">
-            <button
-              v-for="tag in (post.tags || []).slice(0, 4)"
-              :key="tag"
-              type="button"
-              @click="selectedTag = tag"
-            >
-              {{ tag }}
-            </button>
-          </div>
-          <div class="card-actions">
-            <RouterLink class="archive-read-link" :to="readPath(post)">
-              阅读笔记 <span aria-hidden="true">→</span>
-            </RouterLink>
-            <RouterLink
-              v-if="post.isBuiltin"
-              class="archive-read-link"
-              :to="{ path: '/admin/knowledge', query: { source: DP_KNOWLEDGE_SOURCE } }"
-            >
-              导入/编辑
-            </RouterLink>
-            <RouterLink
-              v-else-if="isDpKnowledgePost(post)"
-              class="archive-read-link"
-              :to="`/admin/knowledge/${post.id}`"
-            >
-              编辑
-            </RouterLink>
-          </div>
-        </div>
-      </article>
+      <ArchiveCard
+        v-for="post in filteredPosts"
+        :key="post.id"
+        :post="post"
+        :read-path="readPath(post)"
+        :meta-label="post.isBuiltin ? '内置专题' : ''"
+        :hide-date="Boolean(post.isBuiltin)"
+        read-label="阅读笔记"
+        @select-tag="selectedTag = $event"
+      >
+        <template #actions>
+          <RouterLink
+            v-if="post.isBuiltin"
+            class="archive-read-link"
+            :to="{ path: '/admin/knowledge', query: { source: DP_KNOWLEDGE_SOURCE } }"
+          >
+            导入/编辑
+          </RouterLink>
+          <RouterLink
+            v-else-if="isDpKnowledgePost(post)"
+            class="archive-read-link"
+            :to="`/admin/knowledge/${post.id}`"
+          >
+            编辑
+          </RouterLink>
+        </template>
+      </ArchiveCard>
     </section>
     <section v-else class="empty-state archive-state">
       <p>没有匹配当前条件的知识笔记。</p>
-      <button class="btn btn-primary" type="button" @click="keyword = ''; selectedTag = 'all'">清空筛选</button>
+      <button class="btn btn-primary" type="button" @click="resetFilters">清空筛选</button>
     </section>
   </main>
 </template>

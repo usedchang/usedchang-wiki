@@ -2,7 +2,9 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import DOMPurify from "dompurify";
-import { getAllPosts, getPostById, POST_KIND, POST_LIMITS } from "../utils/postStorage";
+import { POST_KIND, POST_LIMITS } from "../utils/postStorage";
+import { loadPost as fetchPostFromStore, loadPosts } from "../utils/postStore";
+import { SORT_OPTIONS, findAdjacentPosts, sortPosts } from "../utils/postFilter";
 import {
   attachCopyButtons,
   copyTextToClipboard,
@@ -14,7 +16,12 @@ import CommentSection from "../components/CommentSection.vue";
 import { supabaseConfigured } from "../utils/supabase";
 import { pushToast } from "../utils/toast";
 import { SITE_TITLE } from "../constants";
+import { createMathEngineLoader, hasMath } from "../utils/markdownMath";
 import "katex/dist/katex.min.css";
+
+// 动态 import 写在本文件里，katex 才会成为阅读页专属的 chunk；
+// 放到共享模块会被并进入口 chunk，害得首页也下载 470KB。
+const loadMathEngine = createMathEngineLoader(() => import("katex"));
 
 const route = useRoute();
 const router = useRouter();
@@ -57,7 +64,7 @@ async function loadPost(id) {
   tocOpen.value = false;
   appliedRouteHash = "";
   try {
-    const nextPost = await getPostById(id, {
+    const nextPost = await fetchPostFromStore(id, {
       // Drafts are only readable in the local, unconfigured writing mode.
       // A configured Supabase project must keep unpublished posts behind the
       // admin editor/RLS boundary instead of exposing them through /posts/:id.
@@ -67,17 +74,21 @@ async function loadPost(id) {
     if (String(nextPost?.content || "").length > POST_LIMITS.content) {
       throw new Error("文章正文过大，已停止渲染以保护浏览器性能");
     }
+    // 只有正文真的含公式时才拉起 katex；纯文字/纯代码的题解不受影响。
+    if (hasMath(nextPost?.content)) await loadMathEngine();
+    if (request !== loadRequest) return;
     post.value = nextPost;
     if (!nextPost) {
       relatedPosts.value = [];
       return;
     }
     try {
-      const visible = await getAllPosts();
+      const visible = await loadPosts({ includeDrafts: false });
       if (request !== loadRequest) return;
-      relatedPosts.value = visible
-        .filter((item) => item.id !== nextPost.id && item.kind === nextPost.kind)
-        .sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
+      relatedPosts.value = sortPosts(
+        visible.filter((item) => item.id !== nextPost.id && item.kind === nextPost.kind),
+        SORT_OPTIONS.published
+      );
     } catch {
       relatedPosts.value = [];
     }
@@ -131,20 +142,9 @@ const showUpdatedDate = computed(() => {
   return formatDate(post.value.updatedAt) !== formatDate(post.value.publishedAt);
 });
 
-const previousPost = computed(() => {
-  if (!post.value) return null;
-  const published = post.value.publishedAt || 0;
-  return relatedPosts.value
-    .filter((item) => (item.publishedAt || 0) < published)
-    .sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))[0] || null;
-});
-const nextPost = computed(() => {
-  if (!post.value) return null;
-  const published = post.value.publishedAt || 0;
-  return relatedPosts.value
-    .filter((item) => (item.publishedAt || 0) > published)
-    .sort((a, b) => (a.publishedAt || 0) - (b.publishedAt || 0))[0] || null;
-});
+const adjacent = computed(() => findAdjacentPosts(relatedPosts.value, post.value));
+const previousPost = computed(() => adjacent.value.previous);
+const nextPost = computed(() => adjacent.value.next);
 
 function updateProgress() {
   const article = markdownPreview.value;
