@@ -13,6 +13,12 @@ import {
 } from "../utils/postStorage";
 import { applyPostChange, loadPost } from "../utils/postStore";
 import { pushToast } from "../utils/toast";
+import {
+  MAX_SPLIT_RATIO,
+  MIN_SPLIT_RATIO,
+  clampSplitRatio,
+  splitRatioFromPointer,
+} from "../utils/editorSplit";
 import { SITE_TITLE } from "../constants";
 import {
   createMarkdownIt,
@@ -129,6 +135,60 @@ const hasPendingChanges = ref(false);
 const isHydrating = ref(false);
 const isDraggingFile = ref(false);
 const activePane = ref("split");
+
+const gridRef = ref(null);
+/** 分栏模式下左栏占的宽度比例；由中间那条拖拽条调整。 */
+const splitRatio = ref(0.5);
+const isResizing = ref(false);
+
+// 拖拽条那一列的宽度，必须与 CSS 里的 --editor-resizer-size 保持一致。
+const RESIZER_SIZE = 20;
+
+function setSplitFromClientX(clientX) {
+  const grid = gridRef.value;
+  if (!grid) return;
+  // 「指针位置 → 左栏占比」的换算放在 utils 里，好让它可以被单元测试直接覆盖。
+  const ratio = splitRatioFromPointer(clientX, grid.getBoundingClientRect(), RESIZER_SIZE);
+  if (ratio !== null) splitRatio.value = ratio;
+}
+
+function onResizerMove(event) {
+  if (!isResizing.value) return;
+  // 不拦住默认行为的话，拖动会变成选中文字。
+  event.preventDefault();
+  setSplitFromClientX(event.clientX);
+}
+
+function stopResize() {
+  isResizing.value = false;
+  window.removeEventListener("pointermove", onResizerMove);
+  window.removeEventListener("pointerup", stopResize);
+  window.removeEventListener("pointercancel", stopResize);
+}
+
+function startResize(event) {
+  if (event.button !== 0) return;
+  event.preventDefault();
+  isResizing.value = true;
+  window.addEventListener("pointermove", onResizerMove);
+  window.addEventListener("pointerup", stopResize);
+  window.addEventListener("pointercancel", stopResize);
+}
+
+function resetSplit() {
+  splitRatio.value = 0.5;
+}
+
+/** 拖拽条聚焦后可以用方向键调宽度（Shift 加大步长），Home / End 直接跳两端。 */
+function onResizerKeydown(event) {
+  const step = event.shiftKey ? 0.1 : 0.02;
+  if (event.key === "ArrowLeft") splitRatio.value = clampSplitRatio(splitRatio.value - step);
+  else if (event.key === "ArrowRight") splitRatio.value = clampSplitRatio(splitRatio.value + step);
+  else if (event.key === "Home") splitRatio.value = MIN_SPLIT_RATIO;
+  else if (event.key === "End") splitRatio.value = MAX_SPLIT_RATIO;
+  else return;
+  event.preventDefault();
+}
 const importingFile = ref(false);
 const loadedPostId = ref(null);
 
@@ -154,13 +214,30 @@ const unnamedTitle = computed(() => {
 const wordCount = computed(() => markdownText.value.trim().length);
 const lineCount = computed(() => (markdownText.value ? markdownText.value.split(/\r?\n/).length : 0));
 
+/** 状态栏左侧的 Ln：光标所在行。点击 / 输入 / 选中 / 插入工具栏项后都会刷新。 */
+const cursorLine = ref(1);
+
+function updateCursorLine() {
+  const el = textareaRef.value;
+  if (!el) return;
+  const upto = el.value.slice(0, el.selectionStart ?? 0);
+  cursorLine.value = upto ? upto.split(/\r?\n/).length : 1;
+}
+
+/**
+ * 工具栏用字符标签而不是图标字体或 SVG：参考实现（花笺）就是这么做的
+ * （B / I / H / • / 1. / <> / ❝ / ∑ / ∫），既不引依赖，也不会有字形缺失。
+ * label 只是按钮上显示的字，title 是提示文案，action 才是逻辑标识
+ * （插入时按 action 判断，别用 label —— 那会随排版调整而变），
+ * className 只用来调字重与字体。
+ */
 const toolbarItems = [
-  { label: "H2", text: "## " },
-  { label: "粗体", text: "****", cursorOffset: -2 },
-  { label: "斜体", text: "__", cursorOffset: -1 },
-  { label: "代码", text: "```cpp\n\n```", cursorOffset: -7 },
-  { label: "引用", text: "> " },
-  { label: "链接", text: "[链接文字](https://)", cursorOffset: -1 },
+  { label: "H", title: "二级标题", action: "heading", text: "## ", className: "is-bold" },
+  { label: "B", title: "粗体", action: "bold", text: "****", cursorOffset: -2, className: "is-bold" },
+  { label: "I", title: "斜体", action: "italic", text: "__", cursorOffset: -1, className: "is-italic" },
+  { label: "<>", title: "代码块", action: "code", text: "```cpp\n\n```", cursorOffset: -7, className: "is-mono" },
+  { label: "❝", title: "引用", action: "quote", text: "> " },
+  { label: "[]", title: "链接", action: "link", text: "[链接文字](https://)", cursorOffset: -1, className: "is-mono" },
 ];
 
 let saveChain = Promise.resolve();
@@ -353,6 +430,7 @@ function insertAtCursor(text) {
   window.requestAnimationFrame(() => {
     el.focus();
     el.setSelectionRange(cursor, cursor);
+    updateCursorLine();
   });
 }
 
@@ -366,14 +444,15 @@ function insertToolbarItem(item) {
   const end = el.selectionEnd ?? markdownText.value.length;
   const selected = markdownText.value.slice(start, end);
   let insertion = item.text;
-  if (item.label === "粗体" && selected) insertion = `**${selected}**`;
-  if (item.label === "斜体" && selected) insertion = `*${selected}*`;
-  if (item.label === "链接" && selected) insertion = `[${selected}](https://)`;
+  if (item.action === "bold" && selected) insertion = `**${selected}**`;
+  if (item.action === "italic" && selected) insertion = `*${selected}*`;
+  if (item.action === "link" && selected) insertion = `[${selected}](https://)`;
   markdownText.value = `${markdownText.value.slice(0, start)}${insertion}${markdownText.value.slice(end)}`;
   const offset = selected ? insertion.length : Math.max(0, insertion.length + (item.cursorOffset || 0));
   window.requestAnimationFrame(() => {
     el.focus();
     el.setSelectionRange(start + offset, start + offset);
+    updateCursorLine();
   });
 }
 
@@ -654,6 +733,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   loadRequest += 1;
   if (saveTimer.value) window.clearTimeout(saveTimer.value);
+  stopResize();
   window.removeEventListener("keydown", onGlobalKeydown);
   window.removeEventListener("beforeunload", handleBeforeUnload);
 });
@@ -673,10 +753,14 @@ onBeforeUnmount(() => {
         <button type="button" class="btn btn-ghost btn-sm" :class="{ 'editor-pane-active': activePane === 'split' }" @click="activePane = 'split'">并排</button>
         <button type="button" class="btn btn-ghost btn-sm" :class="{ 'editor-pane-active': activePane === 'preview' }" @click="activePane = 'preview'">预览</button>
       </div>
-      <span class="editor-counter">{{ wordCount }} 字 · {{ lineCount }} 行</span>
     </div>
 
-    <div class="editor-grid" :class="`editor-layout-${activePane}`">
+    <div
+      ref="gridRef"
+      class="editor-grid"
+      :class="[`editor-layout-${activePane}`, { 'is-resizing': isResizing }]"
+      :style="{ '--editor-split': splitRatio }"
+    >
       <section
         class="panel editor-panel"
         :class="{ 'editor-panel-hidden': activePane === 'preview' }"
@@ -704,7 +788,7 @@ onBeforeUnmount(() => {
         />
         <input
           v-model="summary"
-          class="editor-title-input"
+          class="editor-title-input is-summary"
           maxlength="1000"
           :placeholder="
             isJournal
@@ -714,7 +798,7 @@ onBeforeUnmount(() => {
         />
         <input
           v-model="tagsText"
-          class="editor-title-input"
+          class="editor-title-input is-tags"
           :maxlength="POST_LIMITS.tags * (POST_LIMITS.tag + 1)"
           :placeholder="
             isJournal
@@ -725,15 +809,19 @@ onBeforeUnmount(() => {
         <div class="editor-tools editor-toolbar" aria-label="Markdown 工具栏">
           <button
             v-for="item in toolbarItems"
-            :key="item.label"
+            :key="item.title"
             type="button"
-            class="btn btn-ghost btn-sm"
-            :title="`插入${item.label}`"
+            class="editor-tool"
+            :class="item.className"
+            :title="`插入${item.title}`"
+            :aria-label="`插入${item.title}`"
+            @mousedown.prevent
             @click="insertToolbarItem(item)"
           >
             {{ item.label }}
           </button>
-          <label class="btn btn-ghost editor-upload-btn">
+          <span class="editor-toolbar-divider" aria-hidden="true"></span>
+          <label class="editor-action editor-upload-btn">
             上传图片
             <input
               type="file"
@@ -741,7 +829,7 @@ onBeforeUnmount(() => {
               @change="handleImagePick"
             />
           </label>
-          <label class="btn btn-primary editor-upload-btn" :class="{ 'btn-loading': importingFile }">
+          <label class="editor-action is-accent editor-upload-btn">
             {{ importingFile ? "导入中…" : "导入 Markdown" }}
             <input
               type="file"
@@ -749,8 +837,7 @@ onBeforeUnmount(() => {
               @change="handleMarkdownPick"
             />
           </label>
-          <button type="button" class="btn btn-ghost" @click="exportMarkdown">导出 .md</button>
-          <span class="editor-tip">可拖入 .md 文件，也可直接粘贴图片</span>
+          <button type="button" class="editor-action" @click="exportMarkdown">导出 .md</button>
         </div>
         <p v-if="isDraggingFile" class="editor-drop-hint">松开鼠标即可导入 Markdown 文件</p>
         <p v-if="publishedAt" class="editor-tip">
@@ -763,14 +850,46 @@ onBeforeUnmount(() => {
           :maxlength="POST_LIMITS.content"
           :placeholder="isJournal ? '在这里写 Markdown 游记…' : (isKnowledge ? '在这里写 Markdown 知识学习笔记…' : '在这里写 Markdown 题解…')"
           @keydown="handleEditorKeydown"
+          @keyup="updateCursorLine"
+          @click="updateCursorLine"
+          @select="updateCursorLine"
           @paste="handleEditorPaste"
         />
       </section>
+
+      <div
+        v-if="activePane === 'split'"
+        class="editor-resizer"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="拖动调整编辑区与预览区的宽度"
+        aria-valuemin="20"
+        aria-valuemax="80"
+        :aria-valuenow="Math.round(splitRatio * 100)"
+        tabindex="0"
+        title="左右拖动调整宽度，双击恢复均分"
+        @pointerdown="startResize"
+        @dblclick="resetSplit"
+        @keydown="onResizerKeydown"
+      ></div>
 
       <section class="panel editor-panel" :class="{ 'editor-panel-hidden': activePane === 'edit' }">
         <h3 class="panel-title">预览区</h3>
         <article ref="previewRef" class="markdown-preview" v-html="renderedHtml"></article>
       </section>
+    </div>
+
+    <div class="editor-statusbar">
+      <div class="editor-statusbar-group">
+        <span class="editor-statusbar-item">Ln {{ cursorLine }}</span>
+        <span class="editor-statusbar-divider" aria-hidden="true">|</span>
+        <span class="editor-statusbar-item">Markdown + LaTeX</span>
+      </div>
+      <div class="editor-statusbar-group">
+        <span class="editor-statusbar-item">UTF-8</span>
+        <span class="editor-statusbar-divider" aria-hidden="true">|</span>
+        <span class="editor-statusbar-item">{{ lineCount }} 行 · {{ wordCount }} 字</span>
+      </div>
     </div>
   </main>
 </template>

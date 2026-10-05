@@ -84,8 +84,16 @@ function escapeHtml(text) {
     .replace(/>/g, "&gt;");
 }
 
-function escapeHtmlAttr(text) {
-  return escapeHtml(text).replace(/"/g, "&quot;");
+/**
+ * 代码块里的浮动控件：语言标签在左上角常驻，复制按钮在右上角悬停淡入。
+ * 两者都直接浮在代码块自己的底色上（无底色、无边框、不占独立一行），
+ * 于是它们只是代码块的一部分，不再单独占一条带底色与分隔线的 header。
+ */
+function codeTools(label) {
+  return (
+    `<div class="code-tools"><span class="code-lang">${escapeHtml(label)}</span>` +
+    '<button type="button" class="copy-btn" aria-label="复制代码" aria-live="polite">复制</button></div>'
+  );
 }
 
 function headingText(token) {
@@ -176,14 +184,15 @@ export function createMarkdownIt() {
       if (resolvedLanguage && hljs.getLanguage(resolvedLanguage)) {
         try {
           const highlighted = hljs.highlight(str, { language: resolvedLanguage }).value;
-          const safeLang = escapeHtmlAttr(lang);
           const langClass = resolvedLanguage.replace(/[^a-z0-9_-]/gi, "");
-          return `<pre class="hljs"><div class="code-header"><span class="code-lang">${safeLang}</span><button type="button" class="copy-btn" aria-label="复制代码" aria-live="polite">复制</button></div><code class="hljs language-${langClass}">${highlighted}</code></pre>`;
+          // 控件写成 <code> 的兄弟节点：绝对定位后浮在代码块自己的底色上，
+          // 既不参与 <pre> 内部的横向滚动，也不影响代码选中。
+          return `<pre class="hljs"><code class="hljs language-${langClass}">${highlighted}</code>${codeTools(lang)}</pre>`;
         } catch {
           /* fall through */
         }
       }
-      return `<pre class="hljs"><div class="code-header"><span class="code-lang">TEXT</span><button type="button" class="copy-btn" aria-label="复制代码" aria-live="polite">复制</button></div><code>${escapeHtml(str)}</code></pre>`;
+      return `<pre class="hljs"><code>${escapeHtml(str)}</code>${codeTools("text")}</pre>`;
     },
   })
     .use(markdownItTaskLists, { enabled: true })

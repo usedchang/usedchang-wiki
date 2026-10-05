@@ -1,101 +1,148 @@
 <script setup>
-import { computed, ref, watch } from "vue";
-import { getSafeExternalUrl } from "../utils/urlSafety";
+import { computed, nextTick, ref, watch } from "vue";
+import {
+  EVENT_FIELDS,
+  STATUS_FIELDS,
+  STATUS_ICON,
+  STATUS_LABEL,
+  STUDY_PLAN_STORAGE_KEY,
+  buildStageColors,
+  computeStats,
+  createRow,
+  daysInMonth,
+  formatMonthLabel,
+  monthOf,
+  nextStatus,
+  parsePlanRows,
+  shortDate,
+  todayKey,
+} from "../utils/studyPlan";
 
-const STORAGE_KEY = "usedchang-weekly-todos";
+const today = todayKey();
+const todayMonth = monthOf(today);
 
-function getWeekInfo(date = new Date()) {
-  const current = new Date(date);
-  const day = current.getDay() || 7;
-  current.setDate(current.getDate() + 4 - day);
-  const yearStart = new Date(current.getFullYear(), 0, 1);
-  const week = Math.ceil((((current - yearStart) / 86400000) + 1) / 7);
-  return {
-    id: `${current.getFullYear()}-W${String(week).padStart(2, "0")}`,
-    label: `${current.getFullYear()} 第 ${week} 周`,
-  };
-}
-
-function defaultState() {
-  const week = getWeekInfo();
-  return {
-    activeWeekId: week.id,
-    weeks: [
-      {
-        id: week.id,
-        label: week.label,
-        todos: [],
-      },
-    ],
-  };
-}
-
-function loadState() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return defaultState();
+function loadRows() {
+  let raw = null;
   try {
-    const parsed = JSON.parse(raw);
-    if (!parsed?.weeks?.length) return defaultState();
-    return parsed;
+    raw = localStorage.getItem(STUDY_PLAN_STORAGE_KEY);
   } catch {
-    return defaultState();
+    // 隐私模式等场景下 localStorage 可能直接抛错，退回空计划即可。
   }
+  return parsePlanRows(raw) || [];
 }
 
-const state = ref(loadState());
-const todoForm = ref({ oj: "Codeforces", problemId: "", title: "", link: "" });
+const rows = ref(loadRows());
+const activeMonth = ref(todayMonth);
 
 watch(
-  state,
-  (value) => localStorage.setItem(STORAGE_KEY, JSON.stringify(value)),
+  rows,
+  (value) => {
+    try {
+      localStorage.setItem(STUDY_PLAN_STORAGE_KEY, JSON.stringify(value));
+    } catch {
+      /* 存不进去也不该打断编辑 */
+    }
+  },
   { deep: true }
 );
 
-const weeks = computed(() => state.value.weeks);
-const activeWeek = computed(
-  () => weeks.value.find((w) => w.id === state.value.activeWeekId) || weeks.value[0]
-);
-const todos = computed(() => activeWeek.value?.todos || []);
-const doneCount = computed(() => todos.value.filter((item) => item.done).length);
-const progressPercent = computed(() => {
-  const n = todos.value.length;
-  if (!n) return 0;
-  return Math.round((doneCount.value / n) * 100);
+/** 日期 → 记录。表格里每一天都要查一次，所以先建索引。 */
+const dayIndex = computed(() => {
+  const index = new Map();
+  for (const row of rows.value) index.set(row.date, row);
+  return index;
 });
 
-function switchWeek(id) {
-  state.value.activeWeekId = id;
+/**
+ * 可选年月 = 记过东西的月份 ∪ 今天所在的月 ∪ 当前正在看的月，
+ * 新的排在前面。这样归档过哪几个月一眼就能看到。
+ */
+const monthOptions = computed(() => {
+  const months = new Set(rows.value.map((row) => monthOf(row.date)).filter(Boolean));
+  months.add(todayMonth);
+  months.add(activeMonth.value);
+  return [...months].sort().reverse();
+});
+
+/** 当前这个月的每一天 —— 表格是按天铺开的，不是按「记过的行」。 */
+const monthDates = computed(() => daysInMonth(activeMonth.value));
+
+/** 本月里已经记过的那些天；统计与阶段配色只关心它们。 */
+const monthRows = computed(() =>
+  monthDates.value.map((date) => dayIndex.value.get(date)).filter(Boolean)
+);
+
+const stats = computed(() => computeStats(monthRows.value, monthDates.value.length));
+const stageColors = computed(() => buildStageColors(monthRows.value));
+
+const statCards = computed(() => [
+  { label: "本月天数", value: String(monthDates.value.length), unit: "天" },
+  { label: "已完成", value: `${stats.value.ok} / ${stats.value.total}` },
+  { label: "部分完成", value: String(stats.value.part) },
+  { label: "未完成", value: String(stats.value.no) },
+  { label: "待完成", value: String(stats.value.rest) },
+]);
+
+function cellText(date, field) {
+  return dayIndex.value.get(date)?.[field] ?? "";
 }
 
-function addCurrentWeek() {
-  const week = getWeekInfo();
-  const exists = weeks.value.some((item) => item.id === week.id);
-  if (!exists) {
-    state.value.weeks.unshift({ id: week.id, label: week.label, todos: [] });
-  }
-  state.value.activeWeekId = week.id;
+function statusOf(date, field) {
+  return dayIndex.value.get(date)?.[field] ?? "";
 }
 
-function addTodo() {
-  if (!todoForm.value.title.trim()) return;
-  activeWeek.value.todos.unshift({
-    id: crypto.randomUUID(),
-    oj: todoForm.value.oj,
-    problemId: todoForm.value.problemId.trim(),
-    title: todoForm.value.title.trim(),
-    link: todoForm.value.link.trim(),
-    done: false,
+function stageColorFor(date) {
+  const row = dayIndex.value.get(date);
+  if (!row) return "transparent";
+  return stageColors.value.get(String(row.e3 || "").trim()) || "transparent";
+}
+
+/**
+ * 取某天的记录；这天还没记过就现建一条。
+ * 只有真的动手编辑了才会落盘 —— 铺开整月时不会凭空生成一堆空记录。
+ */
+function ensureRow(date) {
+  const existing = dayIndex.value.get(date);
+  if (existing) return existing;
+  const row = createRow(date);
+  rows.value = [...rows.value, row].sort((a, b) => a.date.localeCompare(b.date));
+  return row;
+}
+
+/**
+ * contenteditable 的输入：原样落进数据，不做 trim。
+ * 一 trim，数据就和 DOM 里的文本不一致，Vue 会回写文本节点，光标立刻跳到末尾。
+ */
+function onCellInput(event, date, field) {
+  ensureRow(date)[field] = event.target.textContent ?? "";
+}
+
+/** 失焦时才规范化空白；此时元素已经失去焦点，回写不会影响输入位置。 */
+function onCellBlur(event, date, field) {
+  const normalized = String(event.target.textContent || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  ensureRow(date)[field] = normalized;
+  if (event.target.textContent !== normalized) event.target.textContent = normalized;
+}
+
+function cycleStatus(date, field) {
+  const row = ensureRow(date);
+  row[field] = nextStatus(row[field]);
+}
+
+/** 清空这一天：把记录整个删掉，那行回到空白天。 */
+function clearDay(date) {
+  rows.value = rows.value.filter((row) => row.date !== date);
+}
+
+function goToday() {
+  activeMonth.value = todayMonth;
+  nextTick(() => {
+    document
+      .getElementById(`plan-day-${today}`)
+      ?.scrollIntoView({ block: "center", behavior: "smooth" });
   });
-  todoForm.value = { oj: "Codeforces", problemId: "", title: "", link: "" };
-}
-
-function toggleDone(id) {
-  const target = activeWeek.value.todos.find((item) => item.id === id);
-  if (target) target.done = !target.done;
-}
-
-function removeTodo(id) {
-  activeWeek.value.todos = activeWeek.value.todos.filter((item) => item.id !== id);
 }
 </script>
 
@@ -104,136 +151,123 @@ function removeTodo(id) {
     <header class="plan-hero">
       <div class="plan-hero-text">
         <h1 class="plan-hero-title">学习计划</h1>
-        <p class="plan-hero-desc">按周记录刷题，完成一项勾一项。</p>
+        <p class="plan-hero-desc">
+          按年月归档：选一个月份，表格就铺开这个月的每一天，填过的才有记录。
+          点右侧圆点切换状态（完成 → 部分 → 未完成），单元格点进去就能改。
+        </p>
       </div>
-      <div
-        class="plan-progress"
-        role="img"
-        :aria-label="`本周进度 ${doneCount} 题已完成，共 ${todos.length} 题`"
-      >
-        <div
-          class="plan-progress-ring"
-          :style="{ '--plan-p': String(progressPercent) }"
-        />
-        <div class="plan-progress-meta">
-          <span class="plan-progress-value">{{ doneCount }}/{{ todos.length }}</span>
-          <span class="plan-progress-label">本周完成</span>
-        </div>
+      <div class="plan-hero-actions">
+        <button type="button" class="btn btn-ghost" @click="goToday">回到今天</button>
       </div>
     </header>
 
-    <section class="panel plan-week-panel" aria-label="选择周次">
-      <div class="plan-week-head">
-        <h3 class="plan-week-heading">周次</h3>
-        <button type="button" class="btn btn-primary plan-week-action" @click="addCurrentWeek">
-          跳到本周
-        </button>
-      </div>
-      <div class="plan-week-scroll">
-        <button
-          v-for="week in weeks"
-          :key="week.id"
-          type="button"
-          class="plan-week-pill"
-          :class="{ 'plan-week-pill-active': week.id === activeWeek.id }"
-          @click="switchWeek(week.id)"
-        >
-          {{ week.label }}
-        </button>
-      </div>
+    <section class="plan-months" aria-label="选择年月">
+      <button
+        v-for="month in monthOptions"
+        :key="month"
+        type="button"
+        class="plan-month-pill"
+        :class="{ 'is-active': month === activeMonth }"
+        :aria-pressed="month === activeMonth"
+        @click="activeMonth = month"
+      >
+        {{ formatMonthLabel(month) }}
+      </button>
     </section>
 
-    <section class="panel plan-add-panel" aria-label="添加题目">
-      <h3 class="panel-title plan-add-title">添加题目</h3>
-      <div class="plan-form">
-        <div class="plan-field">
-          <label class="plan-label" for="plan-oj">OJ</label>
-          <select id="plan-oj" v-model="todoForm.oj" class="plan-input">
-            <option>Codeforces</option>
-            <option>AtCoder</option>
-            <option>Luogu</option>
-            <option>Other</option>
-          </select>
+    <section class="plan-stats" :aria-label="`${formatMonthLabel(activeMonth)} 完成情况`">
+      <article v-for="item in statCards" :key="item.label" class="plan-stat">
+        <p class="plan-stat-label">{{ item.label }}</p>
+        <p class="plan-stat-value">
+          {{ item.value }}<span v-if="item.unit" class="plan-stat-unit">{{ item.unit }}</span>
+        </p>
+      </article>
+      <article class="plan-stat">
+        <p class="plan-stat-label">整体进度</p>
+        <p class="plan-stat-value">{{ stats.percent }}%</p>
+        <div
+          class="plan-progress-bar"
+          role="progressbar"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuenow="stats.percent"
+          :aria-label="`本月整体进度 ${stats.percent}%`"
+        >
+          <span :style="{ width: `${stats.percent}%` }"></span>
         </div>
-        <div class="plan-field">
-          <label class="plan-label" for="plan-pid">题号</label>
-          <input
-            id="plan-pid"
-            v-model="todoForm.problemId"
-            class="plan-input"
-            placeholder="例如 1941A"
-            autocomplete="off"
-          />
-        </div>
-        <div class="plan-field plan-field-span">
-          <label class="plan-label" for="plan-title">标题 <span class="plan-req">*</span></label>
-          <input
-            id="plan-title"
-            v-model="todoForm.title"
-            class="plan-input"
-            placeholder="题目标题"
-            autocomplete="off"
-          />
-        </div>
-        <div class="plan-field plan-field-span">
-          <label class="plan-label" for="plan-link">链接</label>
-          <input
-            id="plan-link"
-            v-model="todoForm.link"
-            class="plan-input"
-            placeholder="可选，便于一键打开题目页"
-            autocomplete="off"
-          />
-        </div>
-      </div>
-      <div class="plan-form-footer">
-        <button type="button" class="btn btn-primary" @click="addTodo">加入本周列表</button>
-      </div>
+      </article>
     </section>
 
-    <section class="plan-tasks-section" aria-label="本周任务列表">
-      <h3 class="plan-tasks-heading">本周任务</h3>
-      <div class="plan-list-wrap">
-        <article
-          v-for="item in todos"
-          :key="item.id"
-          class="plan-task-card"
-          :data-done="item.done ? '1' : '0'"
-        >
-          <label class="plan-task-main">
-            <input
-              class="plan-task-check"
-              type="checkbox"
-              :checked="item.done"
-              @change="toggleDone(item.id)"
-            />
-            <div class="plan-task-body">
-              <span class="plan-task-badge">{{ item.oj }}</span>
-              <p class="plan-task-title" :class="{ 'plan-task-title-done': item.done }">
-                <span class="plan-task-id">{{ item.problemId || "—" }}</span>
-                {{ item.title }}
-              </p>
-            </div>
-          </label>
-          <div class="plan-task-actions">
-            <a
-              v-if="getSafeExternalUrl(item.link)"
-              class="btn btn-ghost plan-task-link"
-              :href="getSafeExternalUrl(item.link)"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              打开
-            </a>
-            <button type="button" class="btn btn-danger plan-task-del" @click="removeTodo(item.id)">
-              删除
-            </button>
-          </div>
-        </article>
-        <div v-if="!todos.length" class="empty-state plan-empty">
-          本周还没有任务。先在上方填好题目，点「加入本周列表」即可开始打卡。
-        </div>
-      </div>
-    </section>
+    <div class="plan-table-wrap">
+      <table class="plan-table">
+        <colgroup>
+          <col class="plan-col-date" />
+          <col />
+          <col class="plan-col-status" />
+          <col />
+          <col class="plan-col-status" />
+          <col />
+          <col class="plan-col-status" />
+          <col class="plan-col-op" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>日期</th>
+            <th>事件一</th>
+            <th class="plan-th-center">完成</th>
+            <th>事件二</th>
+            <th class="plan-th-center">完成</th>
+            <th>事件三</th>
+            <th class="plan-th-center">完成</th>
+            <th><span class="sr-only">操作</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="date in monthDates"
+            :id="`plan-day-${date}`"
+            :key="date"
+            :class="{ 'is-today': date === today }"
+            :style="{ '--plan-stage': stageColorFor(date) }"
+          >
+            <td class="plan-date">{{ shortDate(date) }}</td>
+            <template v-for="(eventField, slot) in EVENT_FIELDS" :key="eventField">
+              <td>
+                <div
+                  class="plan-cell"
+                  contenteditable="plaintext-only"
+                  role="textbox"
+                  :aria-label="`${shortDate(date)} 事件${slot + 1}`"
+                  @input="onCellInput($event, date, eventField)"
+                  @blur="onCellBlur($event, date, eventField)"
+                  @keydown.enter.prevent="$event.target.blur()"
+                >{{ cellText(date, eventField) }}</div>
+              </td>
+              <td class="plan-status">
+                <button
+                  type="button"
+                  class="plan-status-btn"
+                  :data-status="statusOf(date, STATUS_FIELDS[slot])"
+                  :title="STATUS_LABEL[statusOf(date, STATUS_FIELDS[slot])]"
+                  :aria-label="`${shortDate(date)} 事件${slot + 1}：${STATUS_LABEL[statusOf(date, STATUS_FIELDS[slot])]}`"
+                  @click="cycleStatus(date, STATUS_FIELDS[slot])"
+                >{{ STATUS_ICON[statusOf(date, STATUS_FIELDS[slot])] }}</button>
+              </td>
+            </template>
+            <td class="plan-op">
+              <button
+                type="button"
+                class="plan-del"
+                :aria-label="`清空 ${shortDate(date)} 的记录`"
+                title="清空这一天"
+                @click="clearDay(date)"
+              >
+                ✕
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </main>
 </template>

@@ -120,6 +120,77 @@
   --heat-4: #6ca244;
 }
 
+/* ── 00 内容渲染令牌：代码块 / Markdown 正文 ──
+   一套令牌由阅读页、编辑器预览、DP 专题页共用（三者都挂在 .markdown-preview 上）。
+
+   规格取自参考实现（花笺 floral-notepaper）：代码块是 paper-warm 一层纸、
+   px-4 pt-8 pb-3 的内边距、语言小字浮在角上、复制按钮悬停才出现；正文
+   leading-[1.9]，行内 code 用 paper-warm 底 + 主题强调色。但颜色一律映射到
+   本项目已有的主题变量，所以 4 套主题各自保留自己的色相，不是照搬参考的固定色。
+
+   代码块按「纸质淡墨」处理：不描边、不投影，底色单独画在伪元素上，
+   再用 mask 向上下边缘淡出，于是块体像一块晕开的墨而不是一个矩形框。
+   淡出高度必须小于同侧内边距，代码文字才始终落在不透明的底色上。 */
+:root {
+  --font-mono: "Cascadia Code", ui-monospace, "JetBrains Mono", Consolas, "Microsoft YaHei",
+    monospace;
+  --code-radius: 6px;
+  /* 顶部留白要放得下左上角那枚语言小字（它固定在 top: 12px）。 */
+  --code-pad-top: 34px;
+  --code-pad-x: 18px;
+  --code-pad-bottom: 26px;
+  /* 代码块底色 = 一块实心的纸，比行内 code 略亮一档：边界清晰，但不描边框。
+     academic / eyecare 的 hljs 主题是浅色底，直接套用；
+     modern / dark 的 hljs 语法字是浅色的，必须换成对应深底，否则读不清。 */
+  --code-surface: color-mix(in oklab, var(--surface-soft) 80%, var(--card));
+  /* 语言标签 / 复制按钮浮在代码自己的底色上，颜色要跟着代码底色明暗走：
+     浅色代码底 → 深色控件；深色代码底 → 浅色控件。 */
+  --code-control: color-mix(in oklab, var(--text-soft) 72%, transparent);
+  --code-control-hover-bg: color-mix(in oklab, var(--text) 10%, transparent);
+  /* 悬停 / 已复制时的强调色：深色代码底上需要比 --primary 更亮的一档。 */
+  --code-control-active: var(--primary);
+
+  /* 墨色四层：从 --md-ink 到 --md-ink-ghost 逐级变淡，对应参考实现的
+     ink / ink-soft / ink-faint / ink-ghost。全部由 --text、--text-soft 推导，
+     所以 4 套主题各自跟随，不需要再分主题覆盖一份。 */
+  --md-ink: var(--text);
+  --md-ink-soft: var(--text-soft);
+  --md-ink-faint: color-mix(in oklab, var(--text-soft) 78%, transparent);
+  --md-ink-ghost: color-mix(in oklab, var(--text-soft) 52%, transparent);
+  --md-paper-warm: var(--surface-soft);
+
+  /* Markdown 正文令牌 */
+  --md-leading: 1.9;
+  --md-rule: color-mix(in oklab, var(--border) 62%, transparent);
+  --md-rule-soft: color-mix(in oklab, var(--border) 42%, transparent);
+  --md-inline-code-bg: var(--surface-soft);
+  --md-table-head-bg: color-mix(in oklab, var(--surface-soft) 70%, var(--card));
+}
+
+/* modern → vs2015、dark → github-dark：代码底必须换成 hljs 主题的深底，
+   否则浅色语法字落在浅底上会读不清。正文的线条与行内 code 底也跟着加深。 */
+:root[data-theme="modern"] {
+  --code-surface: #1e1e1e;
+  --code-control: rgba(236, 242, 250, 0.52);
+  --code-control-hover-bg: rgba(255, 255, 255, 0.12);
+  --code-control-active: color-mix(in oklab, var(--primary) 55%, #ffffff);
+  --md-rule: color-mix(in oklab, var(--border) 88%, transparent);
+  --md-rule-soft: color-mix(in oklab, var(--border) 62%, transparent);
+  --md-inline-code-bg: color-mix(in oklab, var(--surface-soft) 85%, #ffffff);
+  --md-table-head-bg: color-mix(in oklab, var(--surface-soft) 80%, #ffffff);
+}
+
+:root[data-theme="dark"] {
+  --code-surface: #0d1117;
+  --code-control: rgba(236, 242, 250, 0.52);
+  --code-control-hover-bg: rgba(255, 255, 255, 0.12);
+  --code-control-active: color-mix(in oklab, var(--primary) 55%, #ffffff);
+  --md-rule: color-mix(in oklab, var(--border) 88%, transparent);
+  --md-rule-soft: color-mix(in oklab, var(--border) 62%, transparent);
+  --md-inline-code-bg: color-mix(in oklab, var(--surface-soft) 85%, #ffffff);
+  --md-table-head-bg: color-mix(in oklab, var(--surface-soft) 80%, #ffffff);
+}
+
 /* ── 02 基础元素与排版（第 1/5 段）──────── */
 * {
   box-sizing: border-box;
@@ -989,11 +1060,132 @@ a {
 }
 
 /* ── 11 学习计划（第 1/3 段）──────── */
-.plan-list {
-  margin: 6px 0 0;
-  padding-left: 18px;
+.plan-page {
+  padding-top: 32px;
+  padding-bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.plan-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.plan-hero-text {
+  min-width: 0;
+}
+
+.plan-hero-title {
+  margin: 0 0 6px;
+  font-size: 1.45rem;
+  font-family: var(--font-title);
+  color: var(--text);
+}
+
+.plan-hero-desc {
+  margin: 0;
+  max-width: 52ch;
+  font-size: 0.92rem;
   color: var(--text-soft);
-  line-height: 1.8;
+  line-height: 1.6;
+}
+
+.plan-hero-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* 年月归档：一排胶囊，横向可滚动。记过东西的月份一眼就能看到。 */
+.plan-months {
+  display: flex;
+  gap: 8px;
+  margin: 0 -4px;
+  padding: 4px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.plan-month-pill {
+  flex: 0 0 auto;
+  padding: 7px 15px;
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface-soft);
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.plan-month-pill:hover {
+  color: var(--text);
+  border-color: color-mix(in oklab, var(--primary) 40%, var(--border));
+}
+
+.plan-month-pill.is-active {
+  color: var(--primary-contrast);
+  background: var(--primary);
+  border-color: transparent;
+}
+
+/* 统计卡片：一排小卡，最后一张带进度条。 */
+.plan-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 12px;
+}
+
+.plan-stat {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: linear-gradient(160deg, var(--card), var(--card-2));
+}
+
+.plan-stat-label {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.8rem;
+}
+
+.plan-stat-value {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.plan-stat-unit {
+  margin-left: 3px;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.plan-progress-bar {
+  height: 7px;
+  margin-top: 10px;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--border) 60%, transparent);
+  overflow: hidden;
+}
+
+.plan-progress-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary), var(--success));
+  transition: width 0.25s ease;
 }
 
 /* ── 04 通用组件：按钮 / 卡片 / 标签 / 提示 / 空态（第 5/12 段）──────── */
@@ -1021,216 +1213,128 @@ a {
 }
 
 /* ── 11 学习计划（第 2/3 段）──────── */
-.plan-page {
-  padding-top: 32px;
-  padding-bottom: 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.plan-hero {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 20px 22px;
-  border-radius: var(--radius-lg);
+.plan-table-wrap {
   border: 1px solid var(--border);
-  background: linear-gradient(145deg, var(--card), var(--card-2));
-  box-shadow: 0 1px 0 color-mix(in oklab, var(--border) 40%, transparent);
-}
-
-.plan-hero-text {
-  min-width: 0;
-}
-
-.plan-hero-title {
-  margin: 0 0 6px;
-  font-size: 1.45rem;
-  font-family: var(--font-title);
-  color: var(--text);
-}
-
-.plan-hero-desc {
-  margin: 0;
-  font-size: 0.95rem;
-  color: var(--text-soft);
-  line-height: 1.5;
-}
-
-.plan-progress {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-shrink: 0;
-}
-
-.plan-progress-ring {
-  --plan-p: 0;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: conic-gradient(
-    var(--primary) calc(var(--plan-p) * 1%),
-    color-mix(in oklab, var(--border) 65%, var(--card)) 0
-  );
-  display: grid;
-  place-items: center;
-}
-
-.plan-progress-ring::after {
-  content: "";
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
+  border-radius: var(--radius-md);
   background: var(--card);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--border) 50%, transparent);
+  overflow: auto;
 }
 
-.plan-progress-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.plan-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
 }
 
-.plan-progress-value {
-  font-size: 1.35rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
-  letter-spacing: 0.02em;
-}
-
-.plan-progress-label {
-  font-size: 0.82rem;
-  color: var(--text-soft);
-}
-
-.plan-week-panel {
-  padding: 14px 16px 16px;
-}
-
-.plan-week-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.plan-week-heading {
-  margin: 0;
-  font-size: 0.92rem;
-  font-weight: 600;
-  color: var(--text-soft);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.plan-week-action {
-  min-height: 40px;
-  padding: 8px 14px;
-  font-size: 0.9rem;
-}
-
-.plan-week-scroll {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  margin: 0 -4px;
-  padding-left: 4px;
-  padding-right: 4px;
-  scrollbar-width: thin;
-  -webkit-overflow-scrolling: touch;
-}
-
-.plan-week-pill {
-  flex: 0 0 auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  padding: 8px 16px;
-  font: inherit;
-  font-size: 0.9rem;
-  font-weight: 600;
+.plan-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 10px;
   color: var(--text-soft);
   background: var(--surface-soft);
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-
-.plan-week-pill:hover {
-  color: var(--text);
-  border-color: color-mix(in oklab, var(--primary) 35%, var(--border));
-}
-
-.plan-week-pill-active {
-  color: var(--primary-contrast);
-  background: var(--primary);
-  border-color: transparent;
-}
-
-.plan-add-panel {
-  padding: 18px 18px 16px;
-}
-
-.plan-add-title {
-  margin-bottom: 16px;
-}
-
-.plan-form {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px 16px;
-}
-
-.plan-field-span {
-  grid-column: 1 / -1;
-}
-
-.plan-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
-.plan-label {
-  font-size: 0.82rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.78rem;
   font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.plan-table td {
+  padding: 0;
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
+  vertical-align: middle;
+}
+
+.plan-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.plan-table tbody tr:hover td {
+  background: color-mix(in oklab, var(--primary) 4%, transparent);
+}
+
+/* 今天那一行整行高亮，一眼就能找到该从哪儿接着填。 */
+.plan-table tbody tr.is-today td {
+  background: color-mix(in oklab, var(--primary) 9%, transparent);
+}
+
+.plan-table tbody tr.is-today:hover td {
+  background: color-mix(in oklab, var(--primary) 13%, transparent);
+}
+
+.plan-col-date {
+  width: 74px;
+}
+
+.plan-col-status {
+  width: 58px;
+}
+
+.plan-col-op {
+  width: 40px;
+}
+
+.plan-th-center {
+  text-align: center;
+}
+
+/* 日期列只读 —— 日期是由选中的年月推出来的，不需要手输。
+   它同时是行首色条的落点：色条颜色由「事件三」的文本决定，同一专题自动同色。
+
+   选择器必须写成 .plan-table td.plan-date：上面那条 `.plan-table td { padding: 0 }`
+   的特异性是 (0,1,1)，高于单独的 .plan-date (0,1,0)，内边距会被它吃掉 ——
+   文字就会贴着边框，还被 4px 的色条压住左边。
+   左边留 14px 是给色条让位。 */
+.plan-table td.plan-date {
+  position: relative;
+  padding: 9px 10px 9px 14px;
   color: var(--text-soft);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.plan-req {
-  color: var(--error);
-  font-weight: 700;
+.plan-table td.plan-date::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  background: var(--plan-stage, transparent);
 }
 
-.plan-input,
-.plan-form .plan-input {
-  width: 100%;
-}
-
-.plan-form-footer {
-  margin-top: 18px;
-  padding-top: 4px;
-}
-
-.plan-tasks-section {
+/* 单元格：平时看不出边界，点进去就能写 —— 一旦给每格画上输入框边框，
+   整张表就变成一格格表单，反而看不清内容。 */
+.plan-cell {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  align-items: center;
+  min-height: 40px;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  outline: none;
 }
 
-.plan-tasks-heading {
-  margin: 0;
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--text);
+.plan-cell:hover {
+  background: color-mix(in oklab, var(--primary) 5%, transparent);
+}
+
+.plan-cell:focus {
+  background: color-mix(in oklab, var(--primary) 9%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--primary) 45%, transparent);
+}
+
+.plan-cell:empty::before {
+  content: "—";
+  color: var(--md-ink-ghost);
 }
 
 /* ── 03 布局骨架：容器 / 页头 / 导航 / 页脚（第 5/7 段）──────── */
@@ -1266,122 +1370,101 @@ textarea {
 }
 
 /* ── 11 学习计划（第 3/3 段）──────── */
-.plan-list-wrap {
-  margin-top: 14px;
-  display: grid;
-  gap: 12px;
-}
-
-.plan-task-card {
-  display: flex;
-  align-items: stretch;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 14px 16px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: linear-gradient(160deg, var(--card), var(--card-2));
-  border-left: 4px solid var(--primary);
-  transition: opacity 0.15s ease;
-}
-
-.plan-task-card[data-done="1"] {
-  border-left-color: color-mix(in oklab, var(--text-soft) 55%, var(--border));
-  opacity: 0.92;
-}
-
-.plan-task-main {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  cursor: pointer;
-  flex: 1;
-  min-width: 0;
-}
-
-.plan-task-check {
-  margin-top: 3px;
-  width: 1.1rem;
-  height: 1.1rem;
-  flex-shrink: 0;
-  accent-color: var(--primary);
-  cursor: pointer;
-}
-
-.plan-task-body {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.plan-task-badge {
-  align-self: flex-start;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
-  background: var(--tag-bg);
-  color: var(--tag-text);
-  border: 1px solid var(--tag-border);
-}
-
-.plan-task-title {
-  margin: 0;
-  font-size: 0.98rem;
-  line-height: 1.45;
-  color: var(--text);
-}
-
-.plan-task-title-done {
-  text-decoration: line-through;
-  color: var(--text-soft);
-}
-
-.plan-task-id {
-  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
-  font-size: 0.88em;
-  font-weight: 600;
-  color: var(--primary);
-  margin-right: 6px;
-}
-
-.plan-task-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.plan-task-link,
-.plan-task-del {
-  min-height: 38px;
-  padding: 6px 12px;
-  font-size: 0.88rem;
-}
-
-.plan-empty {
+.plan-status {
   text-align: center;
-  line-height: 1.55;
 }
 
-@media (max-width: 560px) {
-  .plan-form {
-    grid-template-columns: 1fr;
-  }
+/* 三态圆点：未标记是一圈虚线，三种状态各用各自的语义色。 */
+.plan-status-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  line-height: 1;
+  cursor: pointer;
+  border: 1.5px dashed color-mix(in oklab, var(--border) 85%, transparent);
+  border-radius: var(--radius-sm);
+  background: none;
+  transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
 
-  .plan-task-card {
-    flex-direction: column;
+.plan-status-btn:hover {
+  transform: scale(1.08);
+  border-style: solid;
+}
+
+.plan-status-btn:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--primary) 65%, transparent);
+  outline-offset: 2px;
+}
+
+.plan-status-btn[data-status="ok"] {
+  color: var(--success);
+  border: 1.5px solid color-mix(in oklab, var(--success) 70%, transparent);
+  background: color-mix(in oklab, var(--success) 14%, transparent);
+}
+
+.plan-status-btn[data-status="part"] {
+  color: var(--warning);
+  border: 1.5px solid color-mix(in oklab, var(--warning) 70%, transparent);
+  background: color-mix(in oklab, var(--warning) 15%, transparent);
+}
+
+.plan-status-btn[data-status="no"] {
+  color: var(--error);
+  border: 1.5px solid color-mix(in oklab, var(--error) 65%, transparent);
+  background: color-mix(in oklab, var(--error) 12%, transparent);
+}
+
+.plan-op {
+  text-align: center;
+}
+
+/* 删除按钮平时收起来，鼠标移到那一行才出现。 */
+.plan-del {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  line-height: 1;
+  cursor: pointer;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.plan-table tbody tr:hover .plan-del,
+.plan-del:focus-visible {
+  opacity: 1;
+}
+
+.plan-del:hover {
+  color: var(--error);
+  background: color-mix(in oklab, var(--error) 14%, transparent);
+}
+
+@media (max-width: 720px) {
+  .plan-hero {
     align-items: stretch;
   }
 
-  .plan-task-actions {
-    flex-direction: row;
-    flex-wrap: wrap;
+  .plan-hero-actions {
+    width: 100%;
+  }
+
+  .plan-hero-actions .btn {
+    flex: 1;
+  }
+
+  /* 表格横向滚动时表头不再粘住 —— 页面本身也在滚，两者叠加会晃得难受。 */
+  .plan-table th {
+    position: static;
   }
 }
 
@@ -1487,27 +1570,37 @@ textarea {
   flex-wrap: wrap;
 }
 
+/* 模式切换做成胶囊组：一层浅灰槽 + 选中项浮起 —— 参考实现右上角就是这个形状。 */
 .editor-pane-switch {
   display: inline-flex;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface-soft);
+  gap: 2px;
+  padding: 3px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: color-mix(in oklab, var(--surface-soft) 85%, transparent);
 }
 
 .editor-pane-switch .btn {
-  border-color: transparent;
-}
-
-.editor-pane-switch .editor-pane-active {
-  color: var(--primary-contrast);
-  background: var(--primary);
-}
-
-.editor-counter {
+  min-height: 26px;
+  padding: 0 14px;
   color: var(--text-soft);
-  font-size: 0.86rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  transition: color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.editor-pane-switch .btn:hover {
+  color: var(--md-ink);
+}
+
+.editor-pane-switch .editor-pane-active,
+.editor-pane-switch .editor-pane-active:hover {
+  color: var(--md-ink);
+  background: var(--card);
+  box-shadow: 0 1px 3px color-mix(in oklab, var(--text) 12%, transparent);
 }
 
 .editor-tip {
@@ -1529,17 +1622,78 @@ textarea {
   flex-wrap: wrap;
 }
 
+/* 工具栏：一排纯字符按钮，没有边框也没有底板 —— 参考实现只用了
+   w-6 h-6 rounded text-ink-ghost hover:bg-paper-warm 这一种按钮。 */
 .editor-toolbar {
   justify-content: flex-start;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-soft);
+  gap: 1px;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
 }
 
-.editor-toolbar .editor-tip {
-  margin-left: auto;
-  font-size: 0.82rem;
+.editor-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  color: var(--md-ink-faint);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.editor-tool:hover {
+  color: var(--text-soft);
+  background: var(--md-paper-warm);
+}
+
+.editor-tool:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--primary) 65%, transparent);
+  outline-offset: 1px;
+}
+
+.editor-tool.is-bold { font-weight: 800; }
+.editor-tool.is-italic { font-family: var(--font-title); font-style: italic; }
+.editor-tool.is-mono { font-family: var(--font-mono); font-size: 0.68rem; }
+
+.editor-toolbar-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 7px;
+  background: var(--md-rule-soft);
+}
+
+/* 上传 / 导入 / 导出这类次要入口：平时只是几个浅色小字，悬停才显形。 */
+.editor-action {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.editor-action:hover {
+  color: var(--primary);
+  background: var(--md-paper-warm);
+}
+
+.editor-action.is-accent {
+  color: var(--primary);
 }
 
 .editor-drop-hint {
@@ -1564,131 +1718,366 @@ textarea {
   cursor: pointer;
 }
 
+/* 两栏之间不隔卡片，只隔一条 1px 的极浅竖线（参考实现的分栏就是一条 hairline）。 */
 .editor-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0;
+  /* 拖拽条那一列的宽度；JS 里的 RESIZER_SIZE 必须与它一致。 */
+  --editor-resizer-size: 20px;
 }
 
 .editor-layout-edit,
 .editor-layout-preview {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* 分栏：左栏宽度由 --editor-split 决定（拖拽条会改它），中间留出拖拽条那一列。
+   minmax(0, …) 不能省，否则长代码行会把整列撑开、拖拽也就失控了。 */
+.editor-layout-split {
+  grid-template-columns:
+    minmax(0, calc(var(--editor-split, 0.5) * 100%))
+    var(--editor-resizer-size)
+    minmax(0, 1fr);
 }
 
 .editor-panel-hidden {
   display: none;
 }
 
+/* 编辑区 / 预览区不再是两张卡片：去边框、去圆角、去底色，两边落在同一张纸上。 */
+.editor-panel {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+/* 拖拽条：看得见的只有正中那一条 hairline，但整列都是可以抓的热区 ——
+   热区太窄的话，想拖拽就变成了一件需要瞄准的事。 */
+.editor-resizer {
+  position: relative;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.editor-resizer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--md-rule-soft);
+  transition: background 0.15s ease;
+}
+
+.editor-resizer:hover::before,
+.editor-resizer:focus-visible::before,
+.editor-grid.is-resizing .editor-resizer::before {
+  background: var(--primary);
+}
+
+.editor-resizer:focus-visible {
+  outline: none;
+}
+
+/* 拖动时禁止选中文字，否则拖拽会被当成拖选，光标也会跟着乱跳。 */
+.editor-grid.is-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+/* 编辑区：一圈常驻的淡框，明确标出可以写字的范围。
+   框不随焦点变化，所以下面要把全局的 focus-visible 焦点环关掉 ——
+   否则点进编辑区会突然多出一圈深色 outline，点到外面又消失。 */
 .editor-textarea {
   min-height: 68vh;
   margin: 0;
-  font-family: "Cascadia Code", "Consolas", monospace;
-  line-height: 1.55;
+  padding: 14px 16px;
+  color: var(--md-ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.92rem;
+  line-height: 1.75;
+  border: 1px solid var(--md-rule);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--card) 45%, transparent);
 }
 
+.editor-textarea:focus,
+.editor-textarea:focus-visible {
+  outline: none;
+}
+
+/* 标题 / 摘要 / 标签 = 纸面抬头：无边框、无底色，只留一条极浅下边线，
+   聚焦时才明显起来。标题走衬线大字，摘要与标签降一档。 */
 .editor-title-input {
-  margin-bottom: 10px;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 10px 0 8px;
+  color: var(--md-ink);
+  font-family: var(--font-title);
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.35;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: none;
+  transition: border-color 0.15s ease;
+}
+
+.editor-title-input::placeholder {
+  /* 默认文案（placeholder）要比真实输入淡一大截，一眼就能分出「这是提示」
+     和「这是我写的」。显式写 opacity: 1 是因为 Firefox 会给 ::placeholder
+     一个默认透明度，不覆盖的话这里的颜色会被再打一次折，两个浏览器看起来
+     就不一样了。 */
+  color: color-mix(in oklab, var(--text-soft) 45%, transparent);
+  opacity: 1;
+}
+
+.editor-title-input:focus {
+  border-bottom-color: var(--md-rule);
+  outline: none;
+}
+
+.editor-title-input.is-summary,
+.editor-title-input.is-tags {
+  margin-bottom: 6px;
+  padding: 7px 0;
+  color: var(--md-ink-soft);
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+/* 标签行与下面的工具栏之间也要拉开，否则那排按钮会贴着标签。 */
+.editor-title-input.is-tags {
+  margin-bottom: 20px;
+}
+
+.editor-title-input.is-summary:focus,
+.editor-title-input.is-tags:focus {
+  border-bottom-color: var(--md-rule-soft);
+}
+
+/* 底部状态栏：横贯编辑区的一条极浅上边线 + 一行等宽小字，
+   平时几乎看不见，需要时又都在（参考实现是 h-7 + text-[10px] font-mono）。 */
+.editor-statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 8px;
+  color: var(--md-ink-ghost);
+  font-size: 0.72rem;
+  border-top: 1px solid var(--md-rule-soft);
+}
+
+.editor-statusbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-statusbar-item {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.editor-statusbar-divider {
+  color: var(--md-rule);
 }
 
 /* ── 05 内容渲染：Markdown / 代码块 / 目录 / 评论区（第 2/10 段）──────── */
 .markdown-preview {
   min-height: 68vh;
   overflow: auto;
-  line-height: 1.75;
   color: var(--text);
+  line-height: var(--md-leading);
 }
 
+/* 编辑器预览与阅读页共用这一套正文排版；阅读页只在 .read-markdown 里覆盖
+   标题字体、字号基准、表格滚动这类差异，避免两处各写一份然后慢慢漂移。 */
 .markdown-preview h1,
 .markdown-preview h2,
-.markdown-preview h3 {
-  margin: 0.8em 0 0.5em;
+.markdown-preview h3,
+.markdown-preview h4 {
+  margin: 1.6em 0 0.7em;
+  color: var(--md-ink);
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  text-wrap: balance;
 }
+
+.markdown-preview h1 { margin-top: 1.2em; font-size: 1.6em; }
+.markdown-preview h2 { font-size: 1.28em; }
+.markdown-preview h3 { margin-top: 1.4em; font-size: 1.12em; }
+.markdown-preview h4 { margin-top: 1.2em; font-size: 1em; }
 
 .markdown-preview p,
 .markdown-preview ul,
 .markdown-preview ol,
 .markdown-preview blockquote {
-  margin: 0.5em 0;
+  margin: 1em 0;
 }
 
+.markdown-preview ul,
+.markdown-preview ol {
+  padding-left: 1.5em;
+}
+
+.markdown-preview li {
+  margin: 0.35em 0;
+}
+
+/* 列表符号取主题强调色的淡版，与参考实现 marker:text-bamboo/40 一致；
+   有序列表的序号改用等宽字体，数字列才对得齐。 */
+.markdown-preview li::marker {
+  color: color-mix(in oklab, var(--primary) 45%, transparent);
+}
+
+.markdown-preview ol > li::marker {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+}
+
+/* 引用只留一条细左线：纸面上的一根竖线，而不是一块带底色的卡片。 */
+.markdown-preview blockquote {
+  padding: 0.1em 0 0.1em 1em;
+  color: var(--md-ink-soft);
+  font-style: italic;
+  border-left: 2px solid color-mix(in oklab, var(--primary) 40%, transparent);
+  background: none;
+}
+
+.markdown-preview blockquote > :first-child { margin-top: 0; }
+.markdown-preview blockquote > :last-child { margin-bottom: 0; }
+
+.markdown-preview strong {
+  color: var(--md-ink);
+  font-weight: 600;
+}
+
+.markdown-preview em {
+  color: color-mix(in oklab, var(--primary) 78%, var(--text));
+}
+
+.markdown-preview a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--primary) 38%, transparent);
+  text-underline-offset: 0.2em;
+}
+
+.markdown-preview a:hover {
+  text-decoration-color: currentColor;
+}
+
+/* 分隔线两端淡出，和代码块的边缘淡出用同一套语言。 */
+.markdown-preview hr {
+  height: 1px;
+  margin: 2.2em 0;
+  border: 0;
+  background: linear-gradient(to right, transparent, var(--border), transparent);
+}
+
+/* ── 代码块：不描边、不投影，只有一块实心纸底 ──
+   结构：<pre class="hljs"><code>…</code><div class="code-tools">…</div></pre>
+   关键是没有边框：底色自己就是边界，于是看过去是一块纸，而不是一个框。 */
 .markdown-preview pre {
-  padding: 0;
   position: relative;
-  --code-block-radius: var(--radius-md);
-}
-
-/* Syntax blocks: one rounded shell; hljs theme colors apply inside */
-.markdown-preview pre.hljs {
-  margin: 0.75em 0;
-  border-radius: var(--code-block-radius);
+  margin: 1.1em 0;
+  padding: 0;
+  /* 不描边、不投影：底色自己就是边界，所以看过去是一块纸而不是一个框。 */
+  border: 0;
+  border-radius: var(--code-radius);
+  background: var(--code-surface);
+  box-shadow: none;
   overflow: hidden;
-  border: 1px solid color-mix(in oklab, var(--border) 75%, transparent);
-  box-shadow: 0 2px 12px color-mix(in oklab, var(--border) 28%, transparent);
 }
 
-.markdown-preview pre.hljs code.hljs {
+/* 选择器必须带上 .hljs：highlight.js 主题里有 `pre code.hljs { padding: 1em }`，
+   与本条特异性相等，而主题表是运行时后插进 <head> 的，同等特异性下它会赢，
+   内边距与行距就全归它管了。加上 pre.hljs 把特异性拉开。 */
+.markdown-preview pre.hljs > code,
+.markdown-preview pre:not(.hljs) > code {
+  position: relative;
   display: block;
-  padding: 12px 14px;
+  padding: var(--code-pad-top) var(--code-pad-x) var(--code-pad-bottom);
+  /* 底色在 pre 上，code 必须透明，否则会盖住它。 */
+  background: none;
   overflow-x: auto;
-  border-radius: 0 0 calc(var(--code-block-radius) - 1px) calc(var(--code-block-radius) - 1px);
+  border-radius: 0;
 }
 
-/* Plain fenced blocks without hljs class */
-.markdown-preview pre:not(.hljs) {
-  border-radius: var(--code-block-radius);
-  overflow: auto;
-  background: var(--input-bg);
-  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.08);
-}
-
-.code-header {
+/* 语言标签常驻左上、复制按钮悬停淡入右上，两者都直接浮在代码块自己的底色上：
+   没有底色、没有边框、不占独立一行，所以看过去只是代码块里的两枚小字，
+   而不是一条把代码块切成两半的 header。 */
+.code-tools {
+  position: absolute;
+  /* 与 --code-pad-top(34px) 配合：标签高约 14px，12 + 14 仍小于 34，压不到首行代码。 */
+  top: 12px;
+  left: var(--code-pad-x);
+  right: 8px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  padding: 8px 12px;
-  border-radius: calc(var(--code-block-radius) - 1px) calc(var(--code-block-radius) - 1px) 0 0;
-  background: color-mix(in oklab, var(--surface-soft) 88%, var(--card));
-  border-bottom: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
+  pointer-events: none;
 }
 
 .code-lang {
-  font-size: 0.72rem;
-  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
   font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: var(--code-control);
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 4px 10px;
-  border-radius: var(--radius-sm);
-  background: color-mix(in oklab, var(--input-bg) 70%, transparent);
-  border: 1px solid color-mix(in oklab, var(--border) 45%, transparent);
+  user-select: none;
 }
 
 .copy-btn {
-  color: var(--text-soft);
-  padding: 5px 12px;
-  min-height: 30px;
-  font-size: 0.72rem;
+  pointer-events: auto;
+  color: var(--code-control);
+  padding: 2px 8px;
+  min-height: 22px;
+  min-width: 44px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
   font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
-  opacity: 0.75;
-  min-width: 52px;
   text-align: center;
+  cursor: pointer;
+  border: none;
   border-radius: var(--radius-sm);
-  border: 1px solid color-mix(in oklab, var(--border) 50%, transparent);
-  background: color-mix(in oklab, var(--input-bg) 55%, transparent);
+  /* 常态不画底色，否则又变成一块独立的控件。 */
+  background: none;
+  opacity: 0;
+  transition: opacity 0.18s ease, color 0.15s ease, background 0.15s ease;
+}
+
+/* 悬停（或键盘聚焦）时复制按钮淡入；语言标签不受影响，始终留在左上角。 */
+.markdown-preview pre:hover .copy-btn,
+.copy-btn:focus-visible {
+  opacity: 1;
+}
+
+/* 触屏没有 hover，复制按钮直接常驻。 */
+@media (hover: none) {
+  .copy-btn {
+    opacity: 1;
+  }
 }
 
 .copy-btn:hover {
-  color: var(--primary);
-  opacity: 1;
-  border-color: color-mix(in oklab, var(--primary) 35%, var(--border));
-  background: color-mix(in oklab, var(--primary) 12%, var(--input-bg));
+  color: var(--code-control-active);
+  background: var(--code-control-hover-bg);
 }
 
 .copy-btn:active {
@@ -1704,43 +2093,37 @@ textarea {
   cursor: default;
 }
 
-.copy-btn.copying {
-  color: var(--primary);
-  opacity: 1;
-  border-color: color-mix(in oklab, var(--primary) 45%, var(--border));
-  background: color-mix(in oklab, var(--primary) 10%, var(--input-bg));
-}
-
+.copy-btn.copying,
 .copy-btn.copied {
-  color: var(--primary);
   opacity: 1;
-  border-color: color-mix(in oklab, var(--primary) 60%, var(--border));
-  background: color-mix(in oklab, var(--primary) 20%, var(--input-bg));
+  color: var(--primary);
+  background: var(--code-control-hover-bg);
 }
 
 .copy-btn.copy-failed {
-  color: var(--accent-danger);
   opacity: 1;
-  border-color: color-mix(in oklab, var(--accent-danger) 55%, var(--border));
-  background: color-mix(in oklab, var(--accent-danger) 10%, var(--input-bg));
+  color: var(--accent-danger);
+  background: var(--code-control-hover-bg);
 }
 
-.markdown-preview pre:not(.hljs) code {
-  display: block;
-  padding: 10px 12px;
-  overflow-x: auto;
-}
-
-.markdown-preview code:not(.hljs) {
-  background: var(--input-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 0.1em 0.4em;
+/* 行内 code：纸面底色 + 主题色的等宽小字，不描边。
+   选择器必须写成「不在 pre 里的 code」：兜底的纯文本围栏块输出的是
+   <pre class="hljs"><code>，那个 <code> 没有 .hljs 类，用 code:not(.hljs) 会把它
+   一起命中，于是代码块的文字被染成主题色（modern 主题下就是明显的蓝）。 */
+.markdown-preview :not(pre) > code {
+  padding: 0.15em 0.4em;
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  color: color-mix(in oklab, var(--primary) 85%, var(--text));
+  background: var(--md-inline-code-bg);
+  border: 0;
+  border-radius: 4px;
 }
 
 .markdown-preview table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 0.94em;
 }
 
 /* The merged DP article contains a wide comparison table. Keep it readable
@@ -1756,12 +2139,14 @@ textarea {
 /* ── 05 内容渲染：Markdown / 代码块 / 目录 / 评论区（第 3/10 段）──────── */
 .markdown-preview th,
 .markdown-preview td {
-  border: 1px solid var(--border);
-  padding: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--md-rule-soft);
 }
 
-.markdown-preview a {
-  color: var(--primary);
+.markdown-preview th {
+  color: var(--md-ink);
+  font-weight: 600;
+  background: var(--md-table-head-bg);
 }
 
 /* ── 06 公开归档与阅读（第 1/3 段）──────── */
@@ -1994,17 +2379,22 @@ textarea {
   }
 
   .editor-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* 单列时两栏上下叠放：拖拽条没有意义，隐藏它，分隔线从左边转到上边。 */
+  .editor-resizer {
+    display: none;
+  }
+
+  .editor-layout-split .editor-resizer + .editor-panel {
+    padding-top: 18px;
+    border-top: 1px solid var(--md-rule-soft);
   }
 
   .editor-textarea,
   .markdown-preview {
     min-height: 46vh;
-  }
-
-  .editor-toolbar .editor-tip {
-    width: 100%;
-    margin-left: 0;
   }
 }
 
@@ -2676,23 +3066,24 @@ textarea {
 /* ── Admonition / ??? note 可折叠块 ── */
 
 /* ── 05 内容渲染：Markdown / 代码块 / 目录 / 评论区（第 8/10 段）──────── */
+/* 提示块：只留左侧一条色线和一层极淡同色底，不描边也不做卡片。
+   参考实现（GFM Alerts）就是这个形状：3px 左线 + 小圆角 + 6% 同色底。 */
 .admonition {
-  margin: 16px 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  margin: 1.3em 0;
+  border: 0;
+  border-left: 3px solid color-mix(in oklab, var(--primary) 45%, transparent);
+  border-radius: 0 6px 6px 0;
   overflow: hidden;
-  background: var(--surface-soft);
+  background: color-mix(in oklab, var(--primary) 6%, var(--surface-soft));
 }
 
 .admonition summary {
-  padding: 10px 16px;
-  font-weight: 700;
-  font-size: 0.95rem;
+  padding: 8px 14px;
+  color: var(--md-ink);
+  font-size: 0.92rem;
+  font-weight: 600;
   cursor: pointer;
   user-select: none;
-  color: var(--text);
-  background: var(--card-2);
-  border-bottom: 1px solid var(--border);
   list-style: none;
 }
 
@@ -2703,9 +3094,10 @@ textarea {
 .admonition summary::before {
   content: "▸ ";
   display: inline-block;
-  transition: transform 0.2s ease;
-  font-size: 0.85rem;
+  margin-right: 2px;
   color: var(--primary);
+  font-size: 0.85rem;
+  transition: transform 0.2s ease;
 }
 
 .admonition[open] summary::before {
@@ -2713,28 +3105,55 @@ textarea {
 }
 
 .admonition summary:hover {
-  background: color-mix(in oklab, var(--card-2) 80%, var(--primary) 20%);
+  color: var(--primary);
 }
 
 .admonition > *:not(summary) {
-  margin: 12px 16px;
+  margin: 0 14px 10px;
 }
 
 .admonition > *:last-child {
   margin-bottom: 12px;
 }
 
-/* 类型变体 */
-.admonition-note summary {
-  border-left: 4px solid var(--primary);
+/* 类型变体换的是那条左线的颜色（连同 6% 底），不是整块卡片。 */
+.admonition-note {
+  border-left-color: color-mix(in oklab, var(--primary) 55%, transparent);
 }
 
-.admonition-warning summary {
-  border-left: 4px solid var(--accent-danger);
+.admonition-warning {
+  border-left-color: color-mix(in oklab, var(--accent-danger) 70%, transparent);
+  background: color-mix(in oklab, var(--accent-danger) 6%, var(--surface-soft));
 }
 
-.admonition-example summary {
-  border-left: 4px solid #4d7a3e;
+.admonition-example {
+  border-left-color: color-mix(in oklab, #4d7a3e 70%, transparent);
+  background: color-mix(in oklab, #4d7a3e 6%, var(--surface-soft));
+}
+
+/* 脚注沿用正文的纸面语言，不另造一种块。分隔线由 .markdown-preview hr 负责。 */
+.markdown-preview .footnotes {
+  color: var(--md-ink-soft);
+  font-size: 0.88em;
+}
+
+.markdown-preview .footnotes-list {
+  padding-left: 1.4em;
+}
+
+.markdown-preview .footnote-item p {
+  margin: 0.35em 0;
+}
+
+/* 任务列表：勾选框用主题强调色，和列表符号是一套。 */
+.markdown-preview .task-list-item {
+  list-style: none;
+}
+
+.markdown-preview .task-list-item-checkbox {
+  width: 1em;
+  margin: 0 0.55em 0 -1.35em;
+  accent-color: var(--primary);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -3242,7 +3661,7 @@ textarea:focus-visible {
   margin: 0;
   padding: 0 0 0 1px;
   list-style: none;
-  border-left: 1px solid var(--border);
+  border-left: 1px solid var(--md-rule-soft);
 }
 
 .read-toc li {
@@ -3269,11 +3688,12 @@ textarea:focus-visible {
 .read-toc .toc-level-3 button { padding-left: 24px; }
 .read-toc .toc-level-4 button { padding-left: 34px; font-size: 0.73rem; }
 
+/* 目录的选中与悬停只靠左线和文字色，不铺一块底色 —— 纸面上不该多出一格色块。 */
 .read-toc button:hover,
 .read-toc button.is-active {
   color: var(--primary);
   border-left-color: var(--primary);
-  background: color-mix(in oklab, var(--primary) 7%, transparent);
+  background: transparent;
 }
 
 .read-toc-toggle {
@@ -3286,7 +3706,7 @@ textarea:focus-visible {
   color: var(--text);
   font-family: var(--font-ui);
   font-size: clamp(1rem, 1.6vw, 1.075rem);
-  line-height: 1.9;
+  line-height: var(--md-leading);
   overflow-wrap: anywhere;
 }
 
@@ -3294,23 +3714,15 @@ textarea:focus-visible {
   display: none;
 }
 
-/* 阅读正文标题：公共排版走一条组规则，字号与间距按级别各自覆盖。 */
+/* 阅读页只在这一层写差异：标题用衬线、字号基准、表格横向滚动。
+   字号比例、行距、颜色、列表符号、引用与分隔线等公共排版都由
+   .markdown-preview 那一组规则提供，两处不再各写一份。 */
 .read-markdown h1,
 .read-markdown h2,
 .read-markdown h3,
 .read-markdown h4 {
-  scroll-margin-top: 88px;
-  color: var(--text);
   font-family: var(--font-title);
-  line-height: 1.45;
-  text-wrap: balance;
-}
-
-.read-markdown h2 {
-  margin: 2.25em 0 0.8em;
-  padding-bottom: 0.42em;
-  font-size: clamp(1.42rem, 3vw, 1.72rem);
-  border-bottom: 1px solid var(--border);
+  scroll-margin-top: 88px;
 }
 
 .read-markdown h2:first-child,
@@ -3318,100 +3730,37 @@ textarea:focus-visible {
   margin-top: 0;
 }
 
-.read-markdown h3 {
-  margin: 1.75em 0 0.65em;
-  font-size: clamp(1.2rem, 2.4vw, 1.38rem);
-}
-
-.read-markdown h4 {
-  margin: 1.5em 0 0.55em;
-  font-size: 1.05rem;
-}
-
-.read-markdown p,
-.read-markdown ul,
-.read-markdown ol {
-  margin: 0.9em 0;
-}
-
-.read-markdown ul,
-.read-markdown ol {
-  padding-left: 1.55em;
-}
-
-.read-markdown li {
-  margin: 0.35em 0;
-  padding-left: 0.25em;
-}
-
-.read-markdown blockquote {
-  margin: 0.9em 0;
-  padding: 0.8em 1.1em;
-  color: var(--text-soft);
-  border-left: 4px solid var(--primary);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  background: color-mix(in oklab, var(--primary) 7%, var(--surface-soft));
-}
-
-.read-markdown blockquote > :first-child { margin-top: 0; }
-.read-markdown blockquote > :last-child { margin-bottom: 0; }
-
-.read-markdown a {
-  color: var(--primary);
-  text-decoration: underline;
-  text-decoration-color: color-mix(in oklab, var(--primary) 38%, transparent);
-  text-underline-offset: 0.2em;
-}
-
-.read-markdown a:hover {
-  text-decoration-color: currentColor;
-}
-
-.read-markdown hr {
-  height: 1px;
-  margin: 2.2em 0;
-  border: 0;
-  background: var(--border);
-}
-
+/* 图片只留圆角，不描边也不投影 —— 和代码块一样，边界不该是一条硬线。 */
 .read-markdown img {
   display: block;
   max-width: 100%;
   height: auto;
   margin: 1.5em auto;
-  border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  box-shadow: 0 10px 30px color-mix(in oklab, var(--text) 8%, transparent);
 }
 
-.read-markdown pre.hljs {
+/* 阅读页的代码块略大一号：通过令牌放大会同时撑开底色与淡出区，
+   不要直接写 padding，否则会把淡出层与文字重新错开。 */
+.read-markdown pre {
   margin: 1.35em 0;
-  box-shadow: 0 9px 26px color-mix(in oklab, var(--text) 10%, transparent);
+  --code-pad-top: 34px;
+  --code-pad-x: 20px;
+  --code-pad-bottom: 30px;
 }
 
-.read-markdown pre.hljs code.hljs,
-.read-markdown pre.hljs > code {
-  padding: 18px 20px;
+.read-markdown pre > code {
   font-size: 0.88rem;
   line-height: 1.7;
   tab-size: 2;
 }
 
-.read-markdown code:not(.hljs) {
-  color: color-mix(in oklab, var(--primary) 85%, var(--text));
-}
-
+/* 阅读页的表格可能超出正文宽度，所以单独开一条横向滚动。 */
 .read-markdown table {
   display: block;
   width: 100%;
   margin: 1.4em 0;
   overflow-x: auto;
   white-space: nowrap;
-  border-collapse: collapse;
-}
-
-.read-markdown th {
-  background: var(--surface-soft);
 }
 
 .read-markdown th,
@@ -3425,16 +3774,6 @@ textarea:focus-visible {
   padding: 5px 0;
   overflow-x: auto;
   overflow-y: hidden;
-}
-
-.read-markdown .task-list-item {
-  list-style: none;
-}
-
-.read-markdown .task-list-item-checkbox {
-  width: 1em;
-  margin: 0 0.55em 0 -1.35em;
-  accent-color: var(--primary);
 }
 
 .read-post-nav {
@@ -3754,14 +4093,16 @@ a.read-post-nav-item:hover {
     line-height: 1.82;
   }
 
-  .read-markdown pre.hljs {
+  /* 窄屏代码块：出血到卡片边缘，字号与内边距同步收小（仍走令牌）。 */
+  .read-markdown pre {
     margin-right: -8px;
     margin-left: -8px;
+    --code-pad-top: 30px;
+    --code-pad-x: 14px;
+    --code-pad-bottom: 24px;
   }
 
-  .read-markdown pre.hljs code.hljs,
-  .read-markdown pre.hljs > code {
-    padding: 15px 14px;
+  .read-markdown pre > code {
     font-size: 0.8rem;
   }
 

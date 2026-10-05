@@ -38,3 +38,25 @@ test("does not duplicate source code into a data attribute", () => {
   assert.doesNotMatch(html, /data-code=/);
   assert.match(html, /&lt;tag&gt;&amp;/);
 });
+
+test("keeps the language label and copy button inside the code block", () => {
+  const md = createMarkdownIt();
+  const { html } = renderMarkdown(md, "```cpp\nint main() {}\n```");
+
+  // 控件与 <code> 平级、贴在 <pre> 内部，不再单独占一条 header。
+  assert.match(html, /<pre class="hljs"><code class="hljs language-cpp">/);
+  assert.match(html, /<\/code><div class="code-tools">/);
+  assert.match(html, /<span class="code-lang">cpp<\/span>/);
+  assert.match(html, /class="copy-btn"/);
+  assert.doesNotMatch(html, /code-header/);
+});
+
+test("keeps the copy button on unlabelled fenced blocks", () => {
+  const md = createMarkdownIt();
+  const { html } = renderMarkdown(md, "```\nplain text\n```");
+
+  // 没有语言时走兜底分支，但结构一致：标签写 text，复制按钮照旧可用。
+  assert.match(html, /<pre class="hljs"><code>/);
+  assert.match(html, /<span class="code-lang">text<\/span>/);
+  assert.match(html, /class="copy-btn"/);
+});
